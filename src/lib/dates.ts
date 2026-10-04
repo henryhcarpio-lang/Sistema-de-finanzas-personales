@@ -79,3 +79,15 @@ export const soles = (n: number) =>
     currency: "PEN",
     currencyDisplay: "narrowSymbol",
   }).format(n);
+
+const DIAS_CORTOS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+
+/** "Ayer · sáb 03/10", "Anteayer · vie 02/10" o "lun 28/09" (para fechas distintas de hoy). */
+export function etiquetaFecha(fecha: string, today: string): string {
+  const d = new Date(`${fecha}T00:00:00Z`);
+  const corta = `${DIAS_CORTOS[d.getUTCDay()]} ${fecha.slice(8, 10)}/${fecha.slice(5, 7)}`;
+  if (fecha === today) return `Hoy · ${corta}`;
+  if (fecha === addDays(today, -1)) return `Ayer · ${corta}`;
+  if (fecha === addDays(today, -2)) return `Anteayer · ${corta}`;
+  return fecha.slice(0, 4) === today.slice(0, 4) ? corta : `${corta}/${fecha.slice(0, 4)}`;
+}

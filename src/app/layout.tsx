@@ -7,6 +7,9 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Finanzas",
   description: "Registra tus finanzas en segundos",
+  applicationName: "Finanzas",
+  // iPhone: al agregar a la pantalla de inicio abre a pantalla completa con este nombre.
+  appleWebApp: { capable: true, title: "Finanzas", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

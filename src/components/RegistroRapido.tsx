@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useVozRegistro } from "@/hooks/useVozRegistro";
 import { crearMovimiento } from "@/app/actions";
 import { parseMovimiento } from "@/lib/parser";
-import { soles, todayLima } from "@/lib/dates";
+import { etiquetaFecha, soles, todayLima } from "@/lib/dates";
 import type { Categoria, Draft, Fuente, Preferencia } from "@/lib/types";
 import { MovimientoFields, camposAInput, type Campos } from "./MovimientoFields";
 
@@ -63,7 +63,9 @@ export function RegistroRapido({ prefs, categorias }: { prefs: Preferencia[]; ca
     start(async () => {
       const res = await crearMovimiento({ ...r.input, source, confidence }, corregido);
       if (!res.ok) return setAviso({ ok: false, msg: res.error });
-      setAviso({ ok: true, msg: `Registrado: ${r.input.concept} · ${soles(r.input.amount)}` });
+      const hoy = todayLima();
+      const cuando = r.input.occurred_on === hoy ? "" : ` · ${etiquetaFecha(r.input.occurred_on, hoy)}`;
+      setAviso({ ok: true, msg: `Registrado: ${r.input.concept} · ${soles(r.input.amount)}${cuando}` });
       setEstado({ k: "idle" });
       setTexto("");
       inputRef.current?.focus();
@@ -110,6 +112,11 @@ export function RegistroRapido({ prefs, categorias }: { prefs: Preferencia[]; ca
               {soles(estado.draft.amount)}
             </p>
           </div>
+          {estado.draft.occurred_on !== todayLima() && (
+            <p className="inline-flex items-center gap-1 rounded-lg bg-serie-1/10 px-2 py-1 text-sm font-medium" data-testid="fecha-detectada">
+              <span aria-hidden>📅</span> {etiquetaFecha(estado.draft.occurred_on, todayLima())}
+            </p>
+          )}
           <Confianza valor={estado.draft.confidence} />
           {estado.draft.tags.length > 0 && (
             <div className="flex flex-wrap gap-1">

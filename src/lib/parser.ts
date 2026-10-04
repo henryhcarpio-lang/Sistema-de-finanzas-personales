@@ -1,4 +1,5 @@
 import { todayLima } from "./dates";
+import { extraerFecha } from "./fechaFrase";
 import type { Draft, Naturaleza, Preferencia, Tipo } from "./types";
 
 const norm = (s: string) =>
@@ -166,12 +167,14 @@ export function parseMovimiento(
 ): Draft | null {
   const input = texto.trim();
   if (!input) return null;
-  const monto = extraerMonto(input);
+  // La fecha va primero: en "el 3 de octubre 50 soles" el 3 no es el monto.
+  const conFecha = extraerFecha(input, today);
+  const monto = extraerMonto(conFecha?.resto ?? input);
   if (!monto) return null;
 
   const n = norm(monto.resto);
   const concept = limpiarConcepto(monto.resto);
-  const base = { amount: monto.amount, currency: "PEN" as const, concept, occurred_on: today };
+  const base = { amount: monto.amount, currency: "PEN" as const, concept, occurred_on: conFecha?.fecha ?? today };
 
   let type: Tipo = "egreso";
   let nature: Naturaleza | null = null;
