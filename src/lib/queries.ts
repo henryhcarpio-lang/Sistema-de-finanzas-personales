@@ -1,7 +1,7 @@
 import "server-only";
 import { requireUser } from "./supabase/server";
 import type { Rango } from "./dates";
-import type { Transaction } from "./types";
+import { CATEGORIAS, NATURALEZA_INICIAL, type Categoria, type Preferencia, type Transaction } from "./types";
 
 const COLS =
   "id,occurred_on,occurred_time,amount,currency,type,nature,category,subcategory,concept,account,tags,note,source,confidence,created_at";
@@ -51,4 +51,32 @@ export function resumir(txs: Transaction[]) {
   }
   const categorias = [...porCategoria.entries()].sort((a, b) => b[1] - a[1]);
   return { ...r, balance: r.ingresos - r.gastos - r.ahorro, categorias };
+}
+
+/** Categorías del usuario; la primera vez se crean las iniciales para que pueda editarlas. */
+export async function listarCategorias(): Promise<Categoria[]> {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase.from("fin_categories").select("id,name,nature").order("name");
+  if (error) throw new Error("No se pudieron cargar las categorías");
+  if (data.length) return data as Categoria[];
+  // Se usa lo que devuelve el upsert: repetir el mismo SELECT en este render
+  // devolvería la respuesta vacía memorizada por Next.
+  const { data: creadas } = await supabase
+    .from("fin_categories")
+    .upsert(
+      CATEGORIAS.map((name) => ({ name, nature: NATURALEZA_INICIAL[name], user_id: user.id })),
+      { onConflict: "user_id,name" },
+    )
+    .select("id,name,nature");
+  return ((creadas ?? []) as Categoria[]).sort((a, b) => a.name.localeCompare(b.name, "es"));
+}
+
+export async function listarPreferencias(): Promise<Preferencia[]> {
+  const { supabase } = await requireUser();
+  const { data } = await supabase
+    .from("fin_preferences")
+    .select("keyword,type,nature,category,hits")
+    .order("hits", { ascending: false })
+    .limit(500);
+  return (data ?? []) as Preferencia[];
 }

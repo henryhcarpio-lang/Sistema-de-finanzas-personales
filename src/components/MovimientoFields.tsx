@@ -1,6 +1,6 @@
 "use client";
 
-import { CATEGORIAS, NATURALEZAS, TIPOS, type Naturaleza, type Tipo } from "@/lib/types";
+import { NATURALEZAS, TIPOS, type Categoria, type Naturaleza, type Tipo } from "@/lib/types";
 
 export interface Campos {
   amount: string;
@@ -16,7 +16,10 @@ export interface Campos {
 const NAT_POR_TIPO: Partial<Record<Tipo, Naturaleza | null>> = { ingreso: null, ahorro: "ahorro", deuda: "deuda" };
 
 /** Campos editables reutilizados por el registro rápido y la edición. */
-export function MovimientoFields({ value, onChange }: { value: Campos; onChange: (v: Campos) => void }) {
+export function MovimientoFields({ value, onChange, categorias }: {
+  value: Campos; onChange: (v: Campos) => void; categorias: Categoria[];
+}) {
+  const nombres = categorias.map((c) => c.name);
   const set = <K extends keyof Campos>(k: K, v: Campos[K]) => onChange({ ...value, [k]: v });
   return (
     <div className="grid grid-cols-2 gap-3">
@@ -53,9 +56,15 @@ export function MovimientoFields({ value, onChange }: { value: Campos; onChange:
       </div>
       <div>
         <label className="label" htmlFor="f-cat">Categoría</label>
-        <select id="f-cat" className="field" value={value.category} onChange={(e) => set("category", e.target.value)}>
-          {!CATEGORIAS.includes(value.category as never) && <option>{value.category}</option>}
-          {CATEGORIAS.map((c) => <option key={c}>{c}</option>)}
+        <select id="f-cat" className="field" value={value.category}
+          onChange={(e) => {
+            // Al elegir categoría se propone su naturaleza (editable).
+            const cat = categorias.find((c) => c.name === e.target.value);
+            onChange({ ...value, category: e.target.value,
+              nature: value.type === "ingreso" ? null : cat?.nature ?? value.nature });
+          }}>
+          {!nombres.includes(value.category) && <option>{value.category}</option>}
+          {nombres.map((c) => <option key={c}>{c}</option>)}
         </select>
       </div>
       <div>

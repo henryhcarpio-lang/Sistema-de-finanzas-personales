@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { BottomNav } from "@/components/BottomNav";
 import { cerrarSesion } from "../login/actions";
 
@@ -9,9 +10,12 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
           <span className="text-brand">●</span> Finanzas
         </span>
         <div className="hidden md:block"><BottomNav /></div>
-        <form action={cerrarSesion}>
-          <button className="text-xs text-muted hover:text-fg">Salir</button>
-        </form>
+        <div className="flex items-center gap-4">
+          <Link href="/categorias" className="text-xs text-muted hover:text-fg">Categorías</Link>
+          <form action={cerrarSesion}>
+            <button className="text-xs text-muted hover:text-fg">Salir</button>
+          </form>
+        </div>
       </header>
       <main>{children}</main>
       <div className="md:hidden"><BottomNav /></div>

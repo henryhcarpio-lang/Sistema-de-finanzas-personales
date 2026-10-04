@@ -4,13 +4,13 @@ import { useRef, useState, useTransition } from "react";
 import { crearMovimiento } from "@/app/actions";
 import { parseMovimiento } from "@/lib/parser";
 import { soles, todayLima } from "@/lib/dates";
-import type { Draft } from "@/lib/types";
+import type { Categoria, Draft, Preferencia } from "@/lib/types";
 import { MovimientoFields, camposAInput, type Campos } from "./MovimientoFields";
 
 type Estado =
   | { k: "idle" }
   | { k: "confirmar"; draft: Draft; texto: string }
-  | { k: "editar"; campos: Campos; source: "texto" | "manual"; confidence: number | null };
+  | { k: "editar"; campos: Campos; source: "texto" | "manual"; confidence: number | null; sugerido?: Campos };
 
 const vacio = (): Campos => ({
   amount: "", concept: "", type: "egreso", nature: "necesidad", category: "Otros",
@@ -22,7 +22,7 @@ const draftACampos = (d: Draft): Campos => ({
   occurred_on: d.occurred_on, tags: d.tags.join(", "), note: "",
 });
 
-export function RegistroRapido() {
+export function RegistroRapido({ prefs, categorias }: { prefs: Preferencia[]; categorias: Categoria[] }) {
   const [texto, setTexto] = useState("");
   const [estado, setEstado] = useState<Estado>({ k: "idle" });
   const [aviso, setAviso] = useState<{ ok: boolean; msg: string } | null>(null);
@@ -32,25 +32,27 @@ export function RegistroRapido() {
   function interpretar(e: React.FormEvent) {
     e.preventDefault();
     setAviso(null);
-    const draft = parseMovimiento(texto);
+    const draft = parseMovimiento(texto, todayLima(), prefs);
     if (!draft) {
       setAviso({ ok: false, msg: "No encontré un monto. Prueba: “18 soles taxi”." });
       return;
     }
     if (draft.needsType) {
       // Ambigüedad importante: pedir solo lo imprescindible (el tipo).
-      setEstado({ k: "editar", campos: draftACampos(draft), source: "texto", confidence: draft.confidence });
+      setEstado({ k: "editar", campos: draftACampos(draft), source: "texto", confidence: draft.confidence, sugerido: draftACampos(draft) });
       setAviso({ ok: false, msg: "¿Es un ingreso, un pago de deuda o un gasto? Elige el tipo." });
       return;
     }
     setEstado({ k: "confirmar", draft, texto });
   }
 
-  function guardar(c: Campos, source: "texto" | "manual", confidence: number | null) {
+  function guardar(c: Campos, source: "texto" | "manual", confidence: number | null, sugerido?: Campos) {
     const r = camposAInput(c);
     if ("error" in r) return setAviso({ ok: false, msg: r.error! });
+    // Si el usuario cambió la clasificación propuesta, la app aprende de ello.
+    const corregido = !!sugerido && (sugerido.type !== c.type || sugerido.category !== c.category || sugerido.nature !== c.nature);
     start(async () => {
-      const res = await crearMovimiento({ ...r.input, source, confidence });
+      const res = await crearMovimiento({ ...r.input, source, confidence }, corregido);
       if (!res.ok) return setAviso({ ok: false, msg: res.error });
       setAviso({ ok: true, msg: `Registrado: ${r.input.concept} · ${soles(r.input.amount)}` });
       setEstado({ k: "idle" });
@@ -95,6 +97,7 @@ export function RegistroRapido() {
               {soles(estado.draft.amount)}
             </p>
           </div>
+          <Confianza valor={estado.draft.confidence} />
           {estado.draft.tags.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {estado.draft.tags.map((t) => (
@@ -104,7 +107,7 @@ export function RegistroRapido() {
           )}
           <div className="grid grid-cols-2 gap-2">
             <button className="btn-ghost" disabled={pending}
-              onClick={() => setEstado({ k: "editar", campos: draftACampos(estado.draft), source: "texto", confidence: estado.draft.confidence })}>
+              onClick={() => setEstado({ k: "editar", campos: draftACampos(estado.draft), source: "texto", confidence: estado.draft.confidence, sugerido: draftACampos(estado.draft) })}>
               Editar
             </button>
             <button className="btn-primary" disabled={pending}
@@ -117,11 +120,11 @@ export function RegistroRapido() {
 
       {estado.k === "editar" && (
         <div className="card pop-in space-y-4 p-4">
-          <MovimientoFields value={estado.campos} onChange={(campos) => setEstado({ ...estado, campos })} />
+          <MovimientoFields categorias={categorias} value={estado.campos} onChange={(campos) => setEstado({ ...estado, campos })} />
           <div className="grid grid-cols-2 gap-2">
             <button className="btn-ghost" disabled={pending} onClick={() => { setEstado({ k: "idle" }); setAviso(null); }}>Cancelar</button>
             <button className="btn-primary" disabled={pending}
-              onClick={() => guardar(estado.campos, estado.source, estado.confidence)}>
+              onClick={() => guardar(estado.campos, estado.source, estado.confidence, estado.sugerido)}>
               {pending ? "Guardando…" : "Guardar"}
             </button>
           </div>
@@ -136,4 +139,12 @@ export function RegistroRapido() {
       )}
     </section>
   );
+}
+
+function Confianza({ valor }: { valor: number }) {
+  const [txt, cls] =
+    valor >= 0.9 ? ["Aprendido de tus correcciones", "bg-pos/10 text-pos"]
+    : valor >= 0.7 ? ["Clasificación segura", "bg-bg text-muted"]
+    : ["Revisa la categoría", "bg-neg/10 text-neg"];
+  return <p className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{txt}</p>;
 }

@@ -1,5 +1,5 @@
 import { todayLima } from "./dates";
-import type { Draft, Naturaleza, Tipo } from "./types";
+import type { Draft, Naturaleza, Preferencia, Tipo } from "./types";
 
 const NUMEROS: Record<string, number> = {
   un: 1, uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6,
@@ -10,6 +10,18 @@ const NUMEROS: Record<string, number> = {
 
 const norm = (s: string) =>
   s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+/** Clave con la que se guarda una preferencia aprendida ("Pasaje" → "pasaje"). */
+export const claveConcepto = (concept: string) =>
+  norm(concept).replace(/[^a-z0-9 ]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+
+/** Preferencia cuya clave aparece como palabras completas en el texto; gana la más larga. */
+function buscarPreferencia(texto: string, prefs: Preferencia[]): Preferencia | undefined {
+  const t = ` ${claveConcepto(texto)} `;
+  return prefs
+    .filter((p) => p.keyword && t.includes(` ${p.keyword} `))
+    .sort((a, b) => b.keyword.length - a.keyword.length || b.hits - a.hits)[0];
+}
 
 /** Extrae el monto y devuelve el texto restante (concepto). */
 function extraerMonto(texto: string): { amount: number; resto: string } | null {
@@ -79,7 +91,11 @@ function limpiarConcepto(resto: string): string {
  * Interpreta lenguaje natural ("Un sol pasaje", "Gasté 18 en taxi").
  * Devuelve null si no se detecta un monto.
  */
-export function parseMovimiento(texto: string, today = todayLima()): Draft | null {
+export function parseMovimiento(
+  texto: string,
+  today = todayLima(),
+  prefs: Preferencia[] = [],
+): Draft | null {
   const input = texto.trim();
   if (!input) return null;
   const monto = extraerMonto(input);
@@ -95,6 +111,13 @@ export function parseMovimiento(texto: string, today = todayLima()): Draft | nul
   let tags: string[] = [];
   let confidence = 0.4;
   let needsType = false;
+
+  const pref = buscarPreferencia(monto.resto, prefs);
+  if (pref) {
+    // Lo que el usuario ya corrigió tiene prioridad sobre las reglas genéricas.
+    return { ...base, type: pref.type, nature: pref.type === "ingreso" ? null : pref.nature,
+      category: pref.category, tags: [], confidence: 0.95, needsType: false };
+  }
 
   if (AHORRO.test(n)) {
     type = "ahorro"; nature = "ahorro"; category = "Ahorro"; confidence = 0.9;

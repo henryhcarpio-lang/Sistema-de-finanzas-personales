@@ -54,3 +54,21 @@ describe("concepto", () => {
     expect(p("Pagué 35 del almuerzo").concept).toBe("Almuerzo");
   });
 });
+
+describe("preferencias aprendidas", () => {
+  const prefs = [
+    { keyword: "pasaje", type: "egreso" as const, nature: "deseo" as const, category: "Entretenimiento", hits: 1 },
+    { keyword: "banco", type: "deuda" as const, nature: "deuda" as const, category: "Deudas", hits: 2 },
+  ];
+  it("una corrección previa tiene prioridad sobre las reglas", () => {
+    const d = parseMovimiento("Un sol pasaje", T, prefs)!;
+    expect(d).toMatchObject({ category: "Entretenimiento", nature: "deseo", confidence: 0.95 });
+  });
+  it("resuelve la ambigüedad aprendida de 'Banco 500'", () => {
+    const d = parseMovimiento("Banco 500", T, prefs)!;
+    expect(d).toMatchObject({ type: "deuda", needsType: false });
+  });
+  it("solo coincide con palabras completas", () => {
+    expect(parseMovimiento("20 soles pasajero", T, prefs)!.category).not.toBe("Entretenimiento");
+  });
+});

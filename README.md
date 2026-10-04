@@ -4,7 +4,7 @@ App web mobile-first para registrar movimientos en ~5 segundos: **escribir → i
 
 Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + Postgres con RLS) · Vercel.
 
-## Estado: Fase 1 (núcleo funcional)
+## Estado: Fase 2 (clasificación inteligente) — Fase 1 completada
 
 - Registro por texto en lenguaje natural ("un sol pasaje", "me depositaron 2,500 soles") con tarjeta **Confirmar | Editar**.
 - Clasificación inicial por reglas (tipo, categoría, naturaleza, etiquetas, confianza). Las frases ambiguas ("Banco 500") piden el tipo.
@@ -12,10 +12,12 @@ Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + 
 - Historial con filtros por periodo, categoría, tipo y búsqueda, con totales.
 - Dashboard: ingresos, gastos, balance, ahorro, necesidades/deseos/deudas, gasto por categoría y comparación con el periodo anterior.
 - Autenticación por correo y contraseña; los datos de cada usuario están aislados con RLS.
+- **Fase 2:** categorías editables por usuario (pantalla *Categorías*), con naturaleza por defecto.
+- **Fase 2:** preferencias aprendidas: si corriges tipo, categoría o naturaleza (al registrar o al editar), la app lo recuerda para ese concepto y lo usa con prioridad sobre las reglas. La tarjeta de confirmación indica la confianza.
 
 ## Configuración
 
-Proyecto Supabase: `finanzas-personales` (ref `gjcwiwmqgqlhuquyieia`, región sa-east-1). El esquema de `supabase/migrations/0001_movimientos.sql` ya está aplicado.
+Proyecto Supabase: `finanzas-personales` (ref `gjcwiwmqgqlhuquyieia`, región sa-east-1). Las migraciones de `supabase/migrations/` (0001 y 0002) ya están aplicadas.
 
 1. Copia `.env.example` a `.env.local`; ya incluye la URL y la clave publicable del proyecto:
 
@@ -35,7 +37,8 @@ Nota: Supabase pide confirmar el correo al crear una cuenta (Auth → Providers 
 
 ## Deuda técnica / siguientes fases
 
-- Fase 2: categorías editables en la base de datos y preferencias aprendidas de las correcciones.
+- Renombrar una categoría todavía no está soportado (crear + eliminar). Los movimientos guardan el nombre de la categoría como texto.
+- Las etiquetas aún no se aprenden de las correcciones.
 - Fase 3: voz (micrófono + transcripción).
 - Cuentas y deudas solo existen como campo/tipo; sus tablas llegan en fases posteriores.
 - El dashboard agrega en el servidor sobre las filas del periodo; si el volumen crece, conviene moverlo a vistas o RPC en SQL.

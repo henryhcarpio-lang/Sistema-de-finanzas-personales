@@ -1,8 +1,8 @@
 import { PeriodoSelector, leerPeriodo } from "@/components/PeriodoSelector";
 import { TxList } from "@/components/TxList";
 import { rangoPeriodo, soles, todayLima } from "@/lib/dates";
-import { listarMovimientos, resumir } from "@/lib/queries";
-import { CATEGORIAS, TIPOS } from "@/lib/types";
+import { listarCategorias, listarMovimientos, resumir } from "@/lib/queries";
+import { TIPOS } from "@/lib/types";
 
 const str = (v: string | string[] | undefined) => (typeof v === "string" && v ? v : undefined);
 
@@ -13,6 +13,7 @@ export default async function MovimientosPage({ searchParams }: PageProps<"/movi
   const type = str(sp.tipo);
   const q = str(sp.q)?.slice(0, 60);
   const rango = rangoPeriodo(p, todayLima(), { from: str(sp.from), to: str(sp.to) });
+  const categorias = await listarCategorias();
   const txs = await listarMovimientos({ rango, category, type: TIPOS.includes(type as never) ? type : undefined, q });
   const r = resumir(txs);
 
@@ -26,7 +27,7 @@ export default async function MovimientosPage({ searchParams }: PageProps<"/movi
         <input name="q" defaultValue={q} placeholder="Buscar concepto…" className="field col-span-2" />
         <select name="cat" defaultValue={category ?? ""} className="field" aria-label="Categoría">
           <option value="">Todas las categorías</option>
-          {CATEGORIAS.map((c) => <option key={c}>{c}</option>)}
+          {categorias.map((c) => <option key={c.id}>{c.name}</option>)}
         </select>
         <select name="tipo" defaultValue={type ?? ""} className="field" aria-label="Tipo">
           <option value="">Todos los tipos</option>

@@ -19,6 +19,25 @@ export const CATEGORIAS = [
   "Otros",
 ] as const;
 
+/** Naturaleza sugerida al crear las categorías iniciales de un usuario. */
+export const NATURALEZA_INICIAL: Record<(typeof CATEGORIAS)[number], "necesidad" | "deseo" | "ahorro" | "deuda" | null> = {
+  "Alimentación": "necesidad",
+  "Almuerzo / comida fuera": "necesidad",
+  "Supermercado": "necesidad",
+  "Transporte": "necesidad",
+  "Vivienda": "necesidad",
+  "Servicios": "necesidad",
+  "Salud": "necesidad",
+  "Educación": "necesidad",
+  "Entretenimiento": "deseo",
+  "Compras": "deseo",
+  "Suscripciones": "deseo",
+  "Trabajo": "necesidad",
+  "Deudas": "deuda",
+  "Ahorro": "ahorro",
+  "Otros": null,
+};
+
 export type Tipo = (typeof TIPOS)[number];
 export type Naturaleza = (typeof NATURALEZAS)[number];
 export type Fuente = (typeof FUENTES)[number];
@@ -54,4 +73,18 @@ export interface Transaction {
   source: Fuente;
   confidence: number | null;
   created_at: string;
+}
+
+export interface Preferencia {
+  keyword: string;
+  type: Tipo;
+  nature: Naturaleza | null;
+  category: string;
+  hits: number;
+}
+
+export interface Categoria {
+  id: string;
+  name: string;
+  nature: Naturaleza | null;
 }

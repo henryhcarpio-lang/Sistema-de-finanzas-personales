@@ -3,10 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { actualizarMovimiento, eliminarMovimiento } from "@/app/actions";
-import type { Transaction } from "@/lib/types";
+import type { Categoria, Transaction } from "@/lib/types";
 import { MovimientoFields, camposAInput, type Campos } from "./MovimientoFields";
 
-export function EditarMovimiento({ t }: { t: Transaction }) {
+export function EditarMovimiento({ t, categorias }: { t: Transaction; categorias: Categoria[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +34,7 @@ export function EditarMovimiento({ t }: { t: Transaction }) {
 
   return (
     <div className="card space-y-4 p-4">
-      <MovimientoFields value={campos} onChange={setCampos} />
+      <MovimientoFields categorias={categorias} value={campos} onChange={setCampos} />
       {error && <p role="alert" className="text-sm text-neg">{error}</p>}
       <div className="grid grid-cols-2 gap-2">
         <button className="btn-ghost" disabled={pending} onClick={() => router.back()}>Cancelar</button>
