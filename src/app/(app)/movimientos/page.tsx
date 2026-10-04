@@ -28,15 +28,16 @@ export default async function MovimientosPage({ searchParams }: PageProps<"/movi
           <option value="">Todas las categorías</option>
           {CATEGORIAS.map((c) => <option key={c}>{c}</option>)}
         </select>
-        <select name="tipo" defaultValue={type ?? ""} className="field capitalize" aria-label="Tipo">
+        <select name="tipo" defaultValue={type ?? ""} className="field" aria-label="Tipo">
           <option value="">Todos los tipos</option>
-          {TIPOS.map((t) => <option key={t} value={t}>{t}</option>)}
+          {TIPOS.map((t) => <option key={t} value={t}>{t[0].toUpperCase() + t.slice(1)}</option>)}
         </select>
         <button className="btn-ghost col-span-2">Filtrar</button>
       </form>
-      <div className="card flex justify-between p-4 text-sm">
-        <span className="text-muted">{txs.length} movimientos</span>
-        <span>Gastos <b className="tabular-nums">{soles(r.gastos)}</b> · Ingresos <b className="tabular-nums text-pos">{soles(r.ingresos)}</b></span>
+      <div className="card grid grid-cols-3 gap-2 p-4 text-center text-sm">
+        <div><p className="text-xs text-muted">Movimientos</p><p className="font-semibold tabular-nums">{txs.length}</p></div>
+        <div><p className="text-xs text-muted">Gastos</p><p className="font-semibold tabular-nums">{soles(r.gastos)}</p></div>
+        <div><p className="text-xs text-muted">Ingresos</p><p className="font-semibold tabular-nums text-pos">{soles(r.ingresos)}</p></div>
       </div>
       <TxList items={txs} empty="No hay movimientos con estos filtros." />
     </div>

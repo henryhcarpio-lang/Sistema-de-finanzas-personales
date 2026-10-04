@@ -47,3 +47,10 @@ describe("rangoPeriodo", () => {
     expect(rangoPeriodo("anio", T)).toEqual({ from: "2026-01-01", to: "2026-12-31" });
   });
 });
+
+describe("concepto", () => {
+  it("quita verbos con tilde", () => {
+    expect(p("Gasté 18 soles en taxi").concept).toBe("Taxi");
+    expect(p("Pagué 35 del almuerzo").concept).toBe("Almuerzo");
+  });
+});

@@ -66,7 +66,8 @@ const PAGUE = /\b(pague|pago|abone|cancele)\b/;
 
 function limpiarConcepto(resto: string): string {
   const s = resto
-    .replace(/\b(gaste|gasté|pague|pagué|compre|compré|de|en|por|soles?|sol|s\/\.?|me|el|la|los|las|un|una|unos|unas|para|con|fue|fueron|a)\b/gi, " ")
+    .replace(/(?<!\p{L})(gast[eé]|pagu[eé]|compr[eé]|de|del|en|por|soles?|sol|me|el|la|los|las|un|una|unos|unas|para|con|fue|fueron|a)(?!\p{L})/giu, " ")
+    .replace(/s\/\.?/gi, " ")
     .replace(/[.,;:¡!¿?]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
