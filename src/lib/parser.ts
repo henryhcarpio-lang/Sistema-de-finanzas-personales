@@ -1,5 +1,6 @@
 import { todayLima } from "./dates";
 import { extraerFecha } from "./fechaFrase";
+import { extraerMonto } from "./montos";
 import type { Draft, Naturaleza, Preferencia, Tipo } from "./types";
 
 const norm = (s: string) =>
@@ -15,106 +16,6 @@ function buscarPreferencia(texto: string, prefs: Preferencia[]): Preferencia | u
   return prefs
     .filter((p) => p.keyword && t.includes(` ${p.keyword} `))
     .sort((a, b) => b.keyword.length - a.keyword.length || b.hits - a.hits)[0];
-}
-
-const UNIDADES: Record<string, number> = {
-  un: 1, uno: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5, seis: 6, siete: 7, ocho: 8, nueve: 9,
-  diez: 10, once: 11, doce: 12, trece: 13, catorce: 14, quince: 15, dieciseis: 16, diecisiete: 17,
-  dieciocho: 18, diecinueve: 19, veinte: 20, veintiun: 21, veintiuno: 21, veintiuna: 21, veintidos: 22,
-  veintitres: 23, veinticuatro: 24, veinticinco: 25, veintiseis: 26, veintisiete: 27, veintiocho: 28,
-  veintinueve: 29, treinta: 30, cuarenta: 40, cincuenta: 50, sesenta: 60, setenta: 70, ochenta: 80,
-  noventa: 90, cien: 100, ciento: 100, doscientos: 200, doscientas: 200, trescientos: 300,
-  trescientas: 300, cuatrocientos: 400, cuatrocientas: 400, quinientos: 500, quinientas: 500,
-  seiscientos: 600, seiscientas: 600, setecientos: 700, setecientas: 700, ochocientos: 800,
-  ochocientas: 800, novecientos: 900, novecientas: 900,
-};
-
-/**
- * Convierte una secuencia de palabras ya normalizadas ("dos mil quinientos",
- * "treinta y cinco") en número. Devuelve null si alguna no es numérica.
- */
-export function palabrasANumero(palabras: string[]): number | null {
-  if (!palabras.length) return null;
-  let total = 0;
-  let actual = 0;
-  for (const w of palabras) {
-    if (w === "y") continue;
-    if (w === "mil") {
-      total += (actual || 1) * 1000;
-      actual = 0;
-    } else if (w in UNIDADES) actual += UNIDADES[w];
-    else return null;
-  }
-  return total + actual;
-}
-
-const esPalabraNumero = (w: string) => w in UNIDADES || w === "mil" || w === "y";
-
-/** Monto en dígitos: 2,500 · 2.500,50 · 18.5 · 18,5 · S/ 18 */
-function montoDigitos(raw: string): number {
-  const lastSep = Math.max(raw.lastIndexOf("."), raw.lastIndexOf(","));
-  const decimals = lastSep >= 0 ? raw.length - lastSep - 1 : 0;
-  if (lastSep >= 0 && decimals === 3) return Number(raw.replace(/[.,]/g, ""));
-  if (lastSep >= 0) return Number(raw.slice(0, lastSep).replace(/[.,]/g, "") + "." + raw.slice(lastSep + 1));
-  return Number(raw);
-}
-
-/**
- * Céntimos dictados tras "soles": "con 50", "con cincuenta (céntimos)".
- * `tokens` empieza justo después de "sol/soles". Devuelve [céntimos, tokens consumidos].
- */
-function centimos(tokens: string[]): [number, number] {
-  if (norm(tokens[0] ?? "") !== "con") return [0, 0];
-  const t1 = tokens[1] ?? "";
-  if (/^\d{1,2}$/.test(t1)) {
-    const extra = /^centimos?$/.test(norm(tokens[2] ?? "")) ? 1 : 0;
-    return [Number(t1.length === 1 ? t1 + "0" : t1) / 100, 2 + extra];
-  }
-  let i = 1;
-  while (i < tokens.length && esPalabraNumero(norm(tokens[i]))) i++;
-  const n = palabrasANumero(tokens.slice(1, i).map(norm));
-  if (n === null || n >= 100 || i === 1) return [0, 0];
-  const extra = /^centimos?$/.test(norm(tokens[i] ?? "")) ? 1 : 0;
-  return [n / 100, i + extra];
-}
-
-/** Extrae el monto y devuelve el texto restante (concepto). */
-function extraerMonto(texto: string): { amount: number; resto: string } | null {
-  const re = /(?:s\/\.?\s*)?(\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)/i;
-  const m = re.exec(texto);
-  if (m) {
-    const amount = montoDigitos(m[1]);
-    if (amount > 0) {
-      const antes = texto.slice(0, m.index);
-      const despues = texto.slice(m.index + m[0].length).split(/\s+/).filter(Boolean);
-      // "18 soles con 50" (dictado)
-      if (Number.isInteger(amount) && /^soles?$|^sol$/i.test(despues[0] ?? "")) {
-        const [cent, usados] = centimos(despues.slice(1));
-        if (usados) {
-          const resto = `${antes} ${despues.slice(1 + usados).join(" ")}`;
-          return { amount: Math.round((amount + cent) * 100) / 100, resto };
-        }
-      }
-      return { amount, resto: `${antes} ${despues.join(" ")}` };
-    }
-  }
-
-  // Números en palabras antes de "sol/soles": "dieciocho soles", "dos mil quinientos soles".
-  const tokens = texto.split(/\s+/).filter(Boolean);
-  const limpio = tokens.map((t) => norm(t).replace(/[^a-z0-9]/g, ""));
-  const iSol = limpio.findIndex((t) => t === "sol" || t === "soles");
-  if (iSol > 0) {
-    let ini = iSol;
-    while (ini > 0 && esPalabraNumero(limpio[ini - 1])) ini--;
-    while (ini < iSol && limpio[ini] === "y") ini++;
-    const entero = palabrasANumero(limpio.slice(ini, iSol));
-    if (entero !== null && entero > 0) {
-      const [cent, usados] = centimos(tokens.slice(iSol + 1));
-      const resto = [...tokens.slice(0, ini), ...tokens.slice(iSol + 1 + usados)].join(" ");
-      return { amount: Math.round((entero + cent) * 100) / 100, resto };
-    }
-  }
-  return null;
 }
 
 interface Regla {
