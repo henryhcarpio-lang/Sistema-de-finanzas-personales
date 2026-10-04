@@ -15,15 +15,19 @@ Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + 
 
 ## Configuración
 
-1. Aplica `supabase/migrations/0001_movimientos.sql` en tu proyecto Supabase (SQL Editor o `supabase db push`).
-2. Copia `.env.example` a `.env.local` y completa:
+Proyecto Supabase: `finanzas-personales` (ref `gjcwiwmqgqlhuquyieia`, región sa-east-1). El esquema de `supabase/migrations/0001_movimientos.sql` ya está aplicado.
+
+1. Copia `.env.example` a `.env.local`; ya incluye la URL y la clave publicable del proyecto:
 
 | Variable | Descripción |
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | URL del proyecto Supabase |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clave pública (anon/publishable). **Nunca** la service role key. |
 
-3. `npm install && npm run dev`
+2. `npm install && npm run dev`
+3. En Vercel, configura las mismas dos variables.
+
+Nota: Supabase pide confirmar el correo al crear una cuenta (Auth → Providers → Email → "Confirm email").
 
 ## Scripts
 
