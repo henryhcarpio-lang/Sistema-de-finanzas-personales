@@ -1,16 +1,17 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
+import { useVozRegistro } from "@/hooks/useVozRegistro";
 import { crearMovimiento } from "@/app/actions";
 import { parseMovimiento } from "@/lib/parser";
 import { soles, todayLima } from "@/lib/dates";
-import type { Categoria, Draft, Preferencia } from "@/lib/types";
+import type { Categoria, Draft, Fuente, Preferencia } from "@/lib/types";
 import { MovimientoFields, camposAInput, type Campos } from "./MovimientoFields";
 
 type Estado =
   | { k: "idle" }
-  | { k: "confirmar"; draft: Draft; texto: string }
-  | { k: "editar"; campos: Campos; source: "texto" | "manual"; confidence: number | null; sugerido?: Campos };
+  | { k: "confirmar"; draft: Draft; source: Fuente }
+  | { k: "editar"; campos: Campos; source: Fuente; confidence: number | null; sugerido?: Campos };
 
 const vacio = (): Campos => ({
   amount: "", concept: "", type: "egreso", nature: "necesidad", category: "Otros",
@@ -29,24 +30,32 @@ export function RegistroRapido({ prefs, categorias }: { prefs: Preferencia[]; ca
   const [pending, start] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  function interpretar(e: React.FormEvent) {
-    e.preventDefault();
+  /** Texto escrito o dictado → tarjeta de confirmación (o pedir el tipo si es ambiguo). */
+  function interpretar(frase: string, source: Fuente) {
     setAviso(null);
-    const draft = parseMovimiento(texto, todayLima(), prefs);
+    const draft = parseMovimiento(frase, todayLima(), prefs);
     if (!draft) {
-      setAviso({ ok: false, msg: "No encontré un monto. Prueba: “18 soles taxi”." });
+      if (source === "voz") {
+        // Se deja lo entendido en el campo para corregirlo a mano.
+        setTexto(frase);
+        setAviso({ ok: false, msg: `Entendí «${frase}», pero no encontré un monto. Corrígelo abajo o vuelve a intentarlo.` });
+      } else {
+        setAviso({ ok: false, msg: "No encontré un monto. Prueba: “18 soles taxi”." });
+      }
       return;
     }
     if (draft.needsType) {
       // Ambigüedad importante: pedir solo lo imprescindible (el tipo).
-      setEstado({ k: "editar", campos: draftACampos(draft), source: "texto", confidence: draft.confidence, sugerido: draftACampos(draft) });
+      setEstado({ k: "editar", campos: draftACampos(draft), source, confidence: draft.confidence, sugerido: draftACampos(draft) });
       setAviso({ ok: false, msg: "¿Es un ingreso, un pago de deuda o un gasto? Elige el tipo." });
       return;
     }
-    setEstado({ k: "confirmar", draft, texto });
+    setEstado({ k: "confirmar", draft, source });
   }
 
-  function guardar(c: Campos, source: "texto" | "manual", confidence: number | null, sugerido?: Campos) {
+  const voz = useVozRegistro((frase) => interpretar(frase, "voz"));
+
+  function guardar(c: Campos, source: Fuente, confidence: number | null, sugerido?: Campos) {
     const r = camposAInput(c);
     if ("error" in r) return setAviso({ ok: false, msg: r.error! });
     // Si el usuario cambió la clasificación propuesta, la app aprende de ello.
@@ -63,13 +72,17 @@ export function RegistroRapido({ prefs, categorias }: { prefs: Preferencia[]; ca
 
   return (
     <section className="space-y-3">
-      <form onSubmit={interpretar} className="card flex items-center gap-2 p-2">
+      {voz.soportado && (
+        <Microfono voz={voz} ocupado={pending} onIniciar={() => { setAviso(null); setEstado({ k: "idle" }); voz.iniciar(); }} />
+      )}
+
+      <form onSubmit={(e) => { e.preventDefault(); interpretar(texto, "texto"); }} className="card flex items-center gap-2 p-2">
         <input
           ref={inputRef}
           autoFocus
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
-          placeholder="Ej.: 18 soles taxi"
+          placeholder={voz.soportado ? "O escribe: 18 soles taxi" : "Ej.: 18 soles taxi"}
           aria-label="Describe tu movimiento"
           enterKeyHint="go"
           className="min-h-12 flex-1 bg-transparent px-2 text-base outline-none placeholder:text-muted"
@@ -107,11 +120,11 @@ export function RegistroRapido({ prefs, categorias }: { prefs: Preferencia[]; ca
           )}
           <div className="grid grid-cols-2 gap-2">
             <button className="btn-ghost" disabled={pending}
-              onClick={() => setEstado({ k: "editar", campos: draftACampos(estado.draft), source: "texto", confidence: estado.draft.confidence, sugerido: draftACampos(estado.draft) })}>
+              onClick={() => setEstado({ k: "editar", campos: draftACampos(estado.draft), source: estado.source, confidence: estado.draft.confidence, sugerido: draftACampos(estado.draft) })}>
               Editar
             </button>
             <button className="btn-primary" disabled={pending}
-              onClick={() => guardar(draftACampos(estado.draft), "texto", estado.draft.confidence)}>
+              onClick={() => guardar(draftACampos(estado.draft), estado.source, estado.draft.confidence)}>
               {pending ? "Guardando…" : "Confirmar"}
             </button>
           </div>
@@ -147,4 +160,49 @@ function Confianza({ valor }: { valor: number }) {
     : valor >= 0.7 ? ["Clasificación segura", "bg-bg text-muted"]
     : ["Revisa la categoría", "bg-neg/10 text-neg"];
   return <p className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{txt}</p>;
+}
+
+function Microfono({ voz, ocupado, onIniciar }: {
+  voz: ReturnType<typeof useVozRegistro>; ocupado: boolean; onIniciar: () => void;
+}) {
+  const escuchando = voz.estado === "escuchando";
+  const procesando = voz.estado === "procesando";
+  return (
+    <div className="card flex flex-col items-center gap-3 p-5" aria-live="polite">
+      <button
+        type="button"
+        onClick={escuchando ? voz.detener : onIniciar}
+        disabled={ocupado || procesando}
+        aria-pressed={escuchando}
+        aria-label={escuchando ? "Terminar de escuchar" : "Registrar por voz"}
+        className={`relative flex size-20 items-center justify-center rounded-full transition active:scale-95 disabled:opacity-50 ${
+          escuchando ? "bg-neg text-white" : "bg-brand text-brand-fg"
+        }`}
+      >
+        {escuchando && <span className="absolute inset-0 animate-ping rounded-full bg-neg/40" aria-hidden />}
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden className="relative">
+          {escuchando ? <rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" /> : (
+            <><rect x="9" y="3" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></>
+          )}
+        </svg>
+      </button>
+      <p className="min-h-5 text-center text-sm" data-testid="estado-voz">
+        {escuchando ? (
+          voz.parcial ? <span className="font-medium">“{voz.parcial}”</span> : <span className="text-muted">Escuchando… di, por ejemplo, “18 soles taxi”</span>
+        ) : procesando ? (
+          <span className="text-muted">Procesando…</span>
+        ) : voz.estado === "error" ? (
+          <span className="text-neg">{voz.error}</span>
+        ) : (
+          <span className="text-muted">Toca y dicta tu movimiento</span>
+        )}
+      </p>
+      {escuchando && (
+        <div className="grid w-full grid-cols-2 gap-2">
+          <button type="button" className="btn-ghost" onClick={voz.cancelar}>Cancelar</button>
+          <button type="button" className="btn-primary" onClick={voz.detener}>Terminar</button>
+        </div>
+      )}
+    </div>
+  );
 }

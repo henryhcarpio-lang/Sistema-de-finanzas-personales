@@ -12,7 +12,7 @@ export default async function RegistrarPage() {
       <RegistroRapido prefs={prefs} categorias={categorias} />
       <section className="space-y-2">
         <h2 className="text-sm font-semibold text-muted">Últimos movimientos</h2>
-        <TxList items={recientes} empty="Aún no hay movimientos. Escribe arriba “un sol pasaje” para empezar." />
+        <TxList items={recientes} empty="Aún no hay movimientos. Dicta o escribe “un sol pasaje” para empezar." />
       </section>
     </div>
   );

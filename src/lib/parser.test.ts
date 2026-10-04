@@ -72,3 +72,26 @@ describe("preferencias aprendidas", () => {
     expect(parseMovimiento("20 soles pasajero", T, prefs)!.category).not.toBe("Entretenimiento");
   });
 });
+
+describe("números dictados (voz)", () => {
+  it.each([
+    ["dieciocho soles taxi", 18],
+    ["treinta y cinco soles almuerzo", 35],
+    ["ciento veinte soles supermercado", 120],
+    ["me depositaron dos mil quinientos soles", 2500],
+    ["veintidós soles cine", 22],
+    ["mil soles alquiler", 1000],
+    ["dieciocho soles con cincuenta taxi", 18.5],
+    ["18 soles con 50 taxi", 18.5],
+    ["un sol con veinte céntimos pasaje", 1.2],
+  ])("%s → %d", (frase, monto) => {
+    expect(p(frase).amount).toBe(monto);
+  });
+  it("el concepto no arrastra el número ni los céntimos", () => {
+    expect(p("dieciocho soles con cincuenta taxi").concept).toBe("Taxi");
+    expect(p("18 soles con 50 taxi").concept).toBe("Taxi");
+  });
+  it("palabras sueltas sin 'soles' no son monto", () => {
+    expect(parseMovimiento("dos pasajes", T)).toBeNull();
+  });
+});
