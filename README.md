@@ -17,6 +17,11 @@ Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + 
 - **Fase 2:** preferencias aprendidas: si corriges tipo, categoría o naturaleza (al registrar o al editar), la app lo recuerda para ese concepto y lo usa con prioridad sobre las reglas. La tarjeta de confirmación indica la confianza.
 - **Fase 3:** registro por voz. Botón de micrófono con estados *escuchando* (transcripción en vivo), *procesando*, tarjeta de confirmación y *error*. Termina solo tras una pausa (o con *Terminar*, máximo 10 s). Entiende números dictados ("treinta y cinco soles", "dos mil quinientos", "dieciocho soles con cincuenta"). Los movimientos se guardan con fuente `voz`.
 
+## Producción
+
+- URL: https://finanzas-personales-pun8.vercel.app (proyecto Vercel `finanzas-personales`, funciones en `gru1`, São Paulo, junto a Supabase).
+- En Supabase → Authentication → URL Configuration, usa esa URL como **Site URL** y en **Redirect URLs**.
+
 ## Configuración
 
 Proyecto Supabase: `finanzas-personales` (ref `gjcwiwmqgqlhuquyieia`, región sa-east-1). Las migraciones de `supabase/migrations/` (0001 y 0002) ya están aplicadas.
