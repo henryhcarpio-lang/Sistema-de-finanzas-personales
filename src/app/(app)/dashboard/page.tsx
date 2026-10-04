@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PeriodoSelector, leerPeriodo } from "@/components/PeriodoSelector";
 import { periodoAnterior, rangoPeriodo, soles, todayLima } from "@/lib/dates";
 import { listarMovimientos, resumir } from "@/lib/queries";
@@ -47,8 +48,11 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
           <ul className="space-y-3">
             {r.categorias.map(([cat, v]) => (
               <li key={cat}>
-                <div className="mb-1 flex justify-between text-sm"><span>{cat}</span><span className="tabular-nums">{soles(v)}</span></div>
-                <div className="h-2 rounded-full bg-bg"><div className="h-2 rounded-full bg-brand" style={{ width: `${(v / maxCat) * 100}%` }} /></div>
+                <Link href={`/movimientos?${new URLSearchParams({ p, ...(p === "rango" ? { from: rango.from, to: rango.to } : {}), cat })}`}
+                  className="-mx-2 block rounded-lg px-2 py-1 transition hover:bg-bg" aria-label={`Ver movimientos de ${cat}`}>
+                  <div className="mb-1 flex justify-between text-sm"><span>{cat}</span><span className="tabular-nums">{soles(v)} ›</span></div>
+                  <div className="h-2 rounded-full bg-bg"><div className="h-2 rounded-full bg-brand" style={{ width: `${(v / maxCat) * 100}%` }} /></div>
+                </Link>
               </li>
             ))}
           </ul>

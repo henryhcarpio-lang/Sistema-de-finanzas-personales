@@ -10,6 +10,10 @@ export async function listarMovimientos(opts: {
   rango?: Rango;
   category?: string;
   type?: string;
+  nature?: string;
+  tag?: string;
+  min?: number;
+  max?: number;
   q?: string;
   limit?: number;
 }): Promise<Transaction[]> {
@@ -22,11 +26,30 @@ export async function listarMovimientos(opts: {
   if (opts.rango) query = query.gte("occurred_on", opts.rango.from).lte("occurred_on", opts.rango.to);
   if (opts.category) query = query.eq("category", opts.category);
   if (opts.type) query = query.eq("type", opts.type);
-  if (opts.q) query = query.ilike("concept", `%${opts.q.replace(/[%_\\]/g, "\\$&")}%`);
+  if (opts.nature) query = query.eq("nature", opts.nature);
+  if (opts.tag) query = query.contains("tags", [opts.tag]);
+  if (opts.min !== undefined) query = query.gte("amount", opts.min);
+  if (opts.max !== undefined) query = query.lte("amount", opts.max);
+  if (opts.q) {
+    // Busca en concepto y nota. Se quitan los caracteres con significado en el filtro .or() de PostgREST.
+    const term = opts.q.replace(/[%_\\,().*"]/g, " ").trim();
+    if (term) query = query.or(`concept.ilike.%${term}%,note.ilike.%${term}%`);
+  }
   if (opts.limit) query = query.limit(opts.limit);
   const { data, error } = await query;
   if (error) throw new Error("No se pudieron cargar los movimientos");
   return (data ?? []).map((t) => ({ ...t, amount: Number(t.amount) })) as Transaction[];
+}
+
+/** Etiquetas usadas por el usuario (para el filtro), de las más frecuentes a las menos. */
+export async function listarEtiquetas(): Promise<string[]> {
+  const { supabase } = await requireUser();
+  const { data } = await supabase
+    .from("fin_transactions").select("tags").neq("tags", "{}")
+    .order("occurred_on", { ascending: false }).limit(2000);
+  const cuenta = new Map<string, number>();
+  for (const r of data ?? []) for (const t of r.tags as string[]) cuenta.set(t, (cuenta.get(t) ?? 0) + 1);
+  return [...cuenta.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t);
 }
 
 export async function obtenerMovimiento(id: string): Promise<Transaction | null> {

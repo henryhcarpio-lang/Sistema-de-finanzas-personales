@@ -4,12 +4,13 @@ App web mobile-first para registrar movimientos en ~5 segundos: **hablar o escri
 
 Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + Postgres con RLS) · Vercel.
 
-## Estado: Fase 3 (voz) — Fases 1 y 2 completadas
+## Estado: Fase 4 (historial y filtros) — Fases 1 a 3 completadas
 
 - Registro por texto en lenguaje natural ("un sol pasaje", "me depositaron 2,500 soles") con tarjeta **Confirmar | Editar**.
 - Clasificación inicial por reglas (tipo, categoría, naturaleza, etiquetas, confianza). Las frases ambiguas ("Banco 500") piden el tipo.
 - Registro manual, edición y eliminación con confirmación.
 - Historial con filtros por periodo, categoría, tipo y búsqueda, con totales.
+- **Fase 4:** filtros por naturaleza, etiqueta y rango de monto; periodo "Últimos 30 días"; búsqueda en concepto y nota; agrupación por día, categoría o etiqueta con subtotales; frase de respuesta ("Gastaste S/ 60.00 en Almuerzo este mes"); filtros activos como chips; las categorías del dashboard abren su historial. Los filtros viven en la URL (se pueden guardar o compartir).
 - Dashboard: ingresos, gastos, balance, ahorro, necesidades/deseos/deudas, gasto por categoría y comparación con el periodo anterior.
 - Autenticación por correo y contraseña; los datos de cada usuario están aislados con RLS.
 - **Fase 2:** categorías editables por usuario (pantalla *Categorías*), con naturaleza por defecto.
