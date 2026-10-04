@@ -8,6 +8,7 @@ const ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: "M4 19V10M10 19V5M16 19v-6M22 19H2" },
   { href: "/movimientos", label: "Movimientos", icon: "M4 6h16M4 12h16M4 18h10" },
   { href: "/presupuestos", label: "Presupuestos", icon: "M3 7h18v12H3zM3 7l3-3h12l3 3M12 11v4M10 13h4" },
+  { href: "/pagos", label: "Pagos", icon: "M4 5h16v15H4zM4 10h16M9 3v4M15 3v4" },
 ];
 
 export function BottomNav() {
@@ -25,7 +26,7 @@ export function BottomNav() {
               <Link
                 href={it.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-h-14 min-w-16 flex-col items-center justify-center gap-0.5 rounded-xl px-3 text-[11px] font-medium transition md:min-h-10 md:flex-row md:gap-2 md:text-sm ${
+                className={`flex min-h-14 min-w-14 flex-col items-center justify-center gap-0.5 rounded-xl px-1.5 text-[10px] font-medium transition md:min-h-10 md:flex-row md:gap-2 md:text-sm ${
                   active ? "text-brand" : "text-muted hover:text-fg"
                 }`}
               >

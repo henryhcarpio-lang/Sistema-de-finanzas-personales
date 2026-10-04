@@ -28,7 +28,7 @@ export async function token() {
 /** Deja la cuenta de prueba vacía (RLS limita el borrado a sus propias filas). */
 export async function reiniciar() {
   const t = await token();
-  for (const tabla of ["fin_transactions", "fin_preferences", "fin_categories", "fin_budgets"]) {
+  for (const tabla of ["fin_transactions", "fin_preferences", "fin_categories", "fin_budgets", "fin_recurrents"]) {
     await fetch(`${U}/rest/v1/${tabla}?id=not.is.null`, { method: "DELETE", headers: { apikey: K, Authorization: `Bearer ${t}` } });
   }
 }

@@ -3,9 +3,11 @@ import { BarraNaturaleza } from "@/components/BarraNaturaleza";
 import { GraficoGasto } from "@/components/GraficoGasto";
 import { PeriodoSelector, leerPeriodo } from "@/components/PeriodoSelector";
 import { compararCategorias, proyeccionMes, serieGasto } from "@/lib/analisis";
+import { calendario } from "@/lib/compromisos";
 import { PERIODOS, periodoAnterior, rangoPeriodo, soles, todayLima } from "@/lib/dates";
+import { CuotaFila } from "@/components/CuotaFila";
 import { BarraSobre, DetalleSobre } from "@/components/EstadoSobre";
-import { listarMovimientos, listarPresupuestos, resumir } from "@/lib/queries";
+import { listarCompromisos, listarMovimientos, listarPagos, listarPresupuestos, resumir } from "@/lib/queries";
 
 const str = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined);
 
@@ -14,11 +16,15 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   const p = leerPeriodo(sp.p);
   const hoy = todayLima();
   const rango = rangoPeriodo(p, hoy, { from: str(sp.from), to: str(sp.to) });
-  const [txs, prev, presupuestos] = await Promise.all([
+  const [txs, prev, presupuestos, compromisos, pagos] = await Promise.all([
     listarMovimientos({ rango }),
     listarMovimientos({ rango: periodoAnterior(rango) }),
     listarPresupuestos(),
+    listarCompromisos(),
+    listarPagos(),
   ]);
+  const proximos = calendario(compromisos, pagos, hoy, 7).filter((c) => c.estado !== "pagada");
+  const totalProximos = proximos.reduce((s2, c) => s2 + c.compromiso.amount, 0);
   const enAlerta = presupuestos.filter((x) => x.estado.nivel !== "ok").slice(0, 3);
   const r = resumir(txs);
   const gastoPrev = resumir(prev).gastos;
@@ -59,6 +65,25 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
               </span>{" "}
               que en el periodo anterior ({soles(gastoPrev)}).
             </p>
+          )}
+        </section>
+      )}
+
+      {compromisos.length > 0 && (
+        <section aria-label="Próximos compromisos">
+          <div className="mb-1.5 flex items-baseline justify-between px-1">
+            <h2 className="text-sm font-semibold">Próximos compromisos · 7 días</h2>
+            <Link href="/pagos" className="text-xs text-muted hover:text-fg">Ver todos ›</Link>
+          </div>
+          {proximos.length === 0 ? (
+            <div className="card p-4 text-sm text-pos"><span aria-hidden>✓</span> Nada por pagar esta semana.</div>
+          ) : (
+            <>
+              <ul className="card divide-y divide-line overflow-hidden">
+                {proximos.slice(0, 5).map((c) => <CuotaFila key={`${c.compromiso.id}|${c.fecha}`} cuota={c} />)}
+              </ul>
+              <p className="mt-1.5 px-1 text-xs text-muted tabular-nums">Total: {soles(totalProximos)}{proximos.length > 5 ? ` · ${proximos.length - 5} más en Pagos` : ""}</p>
+            </>
           )}
         </section>
       )}

@@ -1,6 +1,7 @@
 import "server-only";
 import { requireUser } from "./supabase/server";
 import { rangoPeriodo, todayLima, type Rango } from "./dates";
+import type { Compromiso, Pago } from "./compromisos";
 import { estadoPresupuesto, type EstadoPresupuesto } from "./presupuestos";
 import { CATEGORIAS, NATURALEZA_INICIAL, type Categoria, type Preferencia, type Transaction } from "./types";
 
@@ -138,4 +139,30 @@ export async function listarPresupuestos(): Promise<PresupuestoConEstado[]> {
       return { ...b, monthly_limit: limite, estado: estadoPresupuesto(limite, gastado.get(b.category) ?? 0, dia, diasMes) };
     })
     .sort((a, b) => b.estado.porcentaje - a.estado.porcentaje);
+}
+
+/** Compromisos activos (deudas y recurrentes). */
+export async function listarCompromisos(): Promise<Compromiso[]> {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase
+    .from("fin_recurrents")
+    .select("id,kind,name,creditor,category,amount,frequency,day_of_month,start_date,end_date,installments_total,initial_amount,interest_rate")
+    .eq("active", true)
+    .order("name");
+  if (error) throw new Error("No se pudieron cargar los compromisos");
+  return (data ?? []).map((c) => ({
+    ...c,
+    amount: Number(c.amount),
+    initial_amount: c.initial_amount === null ? null : Number(c.initial_amount),
+    interest_rate: c.interest_rate === null ? null : Number(c.interest_rate),
+  })) as Compromiso[];
+}
+
+/** Pagos registrados (movimientos vinculados a una cuota). */
+export async function listarPagos(): Promise<Pago[]> {
+  const { supabase } = await requireUser();
+  const { data } = await supabase
+    .from("fin_transactions").select("recurrent_id,due_date,amount")
+    .not("recurrent_id", "is", null).limit(5000);
+  return (data ?? []).map((p) => ({ ...p, amount: Number(p.amount) })) as Pago[];
 }

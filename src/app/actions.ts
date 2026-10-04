@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { soles } from "@/lib/dates";
+import { soles, todayLima } from "@/lib/dates";
 import { avisoTrasGasto, estadoPresupuesto } from "@/lib/presupuestos";
 import { mesActual } from "@/lib/queries";
 import { requireUser } from "@/lib/supabase/server";
@@ -189,6 +189,85 @@ export async function eliminarPresupuesto(id: string): Promise<ActionResult> {
     if (error) return { ok: false, error: "No se pudo eliminar" };
     revalidar();
     return { ok: true, id };
+  } catch {
+    return { ok: false, error: "Sesión expirada" };
+  }
+}
+
+const fechaIso = z.iso.date();
+const CompromisoInput = z.object({
+  kind: z.enum(["deuda", "recurrente"]),
+  name: z.string().trim().min(1).max(80),
+  creditor: z.string().trim().max(80).nullable(),
+  category: z.string().trim().min(1).max(60),
+  amount: z.number().positive().max(1e9),
+  frequency: z.enum(["semanal", "mensual", "anual"]),
+  day_of_month: z.number().int().min(1).max(31).nullable(),
+  start_date: fechaIso,
+  installments_total: z.number().int().positive().max(1200).nullable(),
+  initial_amount: z.number().positive().max(1e10).nullable(),
+  interest_rate: z.number().min(0).max(1000).nullable(),
+}).refine((c) => c.frequency !== "mensual" || c.day_of_month !== null, { message: "Indica el día de pago" });
+
+export async function crearCompromiso(input: z.infer<typeof CompromisoInput>): Promise<ActionResult> {
+  const parsed = CompromisoInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  try {
+    const { supabase, user } = await requireUser();
+    const { data, error } = await supabase
+      .from("fin_recurrents").insert({ ...parsed.data, user_id: user.id }).select("id").single();
+    if (error) return { ok: false, error: "No se pudo guardar" };
+    revalidar();
+    return { ok: true, id: data.id };
+  } catch {
+    return { ok: false, error: "Sesión expirada" };
+  }
+}
+
+/** Elimina el compromiso; los pagos ya hechos se conservan como movimientos. */
+export async function eliminarCompromiso(id: string): Promise<ActionResult> {
+  if (!z.uuid().safeParse(id).success) return { ok: false, error: "Id inválido" };
+  try {
+    const { supabase } = await requireUser();
+    const { error } = await supabase.from("fin_recurrents").delete().eq("id", id);
+    if (error) return { ok: false, error: "No se pudo eliminar" };
+    revalidar();
+    return { ok: true, id };
+  } catch {
+    return { ok: false, error: "Sesión expirada" };
+  }
+}
+
+/**
+ * Registra el pago de una cuota: crea el movimiento real (fecha de hoy) vinculado
+ * a la cuota. El índice único impide pagar dos veces la misma cuota.
+ */
+export async function pagarCuota(recurrentId: string, dueDate: string): Promise<ActionResult> {
+  if (!z.uuid().safeParse(recurrentId).success || !fechaIso.safeParse(dueDate).success) return { ok: false, error: "Datos inválidos" };
+  try {
+    const { supabase, user } = await requireUser();
+    const { data: c } = await supabase
+      .from("fin_recurrents").select("kind,name,category,amount").eq("id", recurrentId).maybeSingle();
+    if (!c) return { ok: false, error: "Compromiso no encontrado" };
+    const { data: cat } = await supabase.from("fin_categories").select("nature").eq("name", c.category).maybeSingle();
+    const { data, error } = await supabase.from("fin_transactions").insert({
+      user_id: user.id,
+      occurred_on: todayLima(),
+      amount: Number(c.amount),
+      currency: "PEN",
+      type: c.kind === "deuda" ? "deuda" : "egreso",
+      nature: c.kind === "deuda" ? "deuda" : (cat?.nature ?? "necesidad"),
+      category: c.category,
+      concept: c.name,
+      tags: [],
+      source: "manual",
+      confidence: null,
+      recurrent_id: recurrentId,
+      due_date: dueDate,
+    }).select("id").single();
+    if (error) return { ok: false, error: error.code === "23505" ? "Esta cuota ya está pagada" : "No se pudo registrar el pago" };
+    revalidar();
+    return { ok: true, id: data.id };
   } catch {
     return { ok: false, error: "Sesión expirada" };
   }

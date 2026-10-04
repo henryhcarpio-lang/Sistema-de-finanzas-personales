@@ -4,7 +4,7 @@ App web mobile-first para registrar movimientos en ~5 segundos: **hablar o escri
 
 Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + Postgres con RLS) · Vercel.
 
-## Estado: Fases 1 a 6 completadas
+## Estado: Fases 1 a 7 completadas
 
 - Registro por texto en lenguaje natural ("un sol pasaje", "me depositaron 2,500 soles") con tarjeta **Confirmar | Editar**.
 - Clasificación inicial por reglas (tipo, categoría, naturaleza, etiquetas, confianza). Las frases ambiguas ("Banco 500") piden el tipo.
@@ -15,6 +15,7 @@ Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + 
 - Autenticación por correo y contraseña; los datos de cada usuario están aislados con RLS.
 - **Fase 5:** dashboard avanzado: gráfico de gasto por día (por mes en el periodo Año) con tooltip, foco con teclado y vista de tabla; reparto necesidades / deseos / deudas; proyección del gasto al cierre del mes; variación por categoría y total frente al periodo anterior.
 - **Fase 6:** presupuestos mensuales por categoría (sobres): gastado, disponible, % usado y proyección; estados *en orden*, *en riesgo* (la proyección supera el límite), *cerca del límite* (≥ 80 %) y *excedido*, siempre con icono y texto. Al registrar un gasto con presupuesto, la app dice cuánto queda. Nunca bloquea un gasto.
+- **Fase 7:** deudas y pagos recurrentes (pestaña *Pagos*). Cuotas mensuales, semanales o anuales calculadas a partir de cada compromiso; vencidas, de hoy y próximas; botón **Pagar** que crea el movimiento real vinculado a la cuota (una cuota futura nunca cuenta como gasto, y no se puede pagar dos veces). Deudas con saldo, cuotas pagadas/total, acreedor y tasa. El dashboard muestra los próximos compromisos de 7 días.
 - **Fechas en la frase:** "ayer 18 soles taxi", "anteayer…", "hace 3 días…", "el lunes…", "el 3 de octubre…", "el día 10…". La tarjeta muestra la fecha detectada.
 - **Instalable:** manifiesto e iconos para "Agregar a la pantalla de inicio" (Android e iPhone).
 - **Fase 2:** categorías editables por usuario (pantalla *Categorías*), con naturaleza por defecto.
@@ -29,6 +30,7 @@ Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + 
 4. **Dashboard:** cómo vas en el mes, proyección de cierre y en qué estás gastando (toca una categoría para ver su detalle).
 5. **Movimientos:** busca, filtra y agrupa para responder "¿cuánto gasté en…?".
 6. **Presupuestos:** define un límite mensual para tus categorías principales; la app te avisa al acercarte.
+7. **Pagos:** registra una vez tus préstamos, tarjetas y pagos fijos; cuando pagues una cuota, pulsa **Pagar** y queda registrada como gasto.
 
 ## Producción
 
@@ -37,7 +39,7 @@ Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + 
 
 ## Configuración
 
-Proyecto Supabase: `finanzas-personales` (ref `gjcwiwmqgqlhuquyieia`, región sa-east-1). Las migraciones de `supabase/migrations/` (0001 a 0003) ya están aplicadas.
+Proyecto Supabase: `finanzas-personales` (ref `gjcwiwmqgqlhuquyieia`, región sa-east-1). Las migraciones de `supabase/migrations/` (0001 a 0004) ya están aplicadas.
 
 1. Copia `.env.example` a `.env.local`; ya incluye la URL y la clave publicable del proyecto:
 
@@ -81,5 +83,6 @@ Necesitan una cuenta de prueba confirmada en Supabase y `.env.local`. Opcional: 
 - Los presupuestos son mensuales; periodos semanales o anuales quedan para más adelante.
 - La app es instalable pero aún no funciona sin conexión (no hay service worker).
 - Voz: si en el futuro se necesita soporte en Firefox o más precisión, se puede cambiar a transcripción en el servidor (p. ej. Whisper); el componente solo entrega texto a `parseMovimiento`.
-- Cuentas y deudas solo existen como campo/tipo; sus tablas llegan en fases posteriores. "Próximos compromisos" del dashboard depende de la Fase 7 (deudas y recurrentes).
+- Cuentas (efectivo, banco, tarjeta) solo existen como campo; su gestión llega más adelante.
+- Compromisos: aún no se editan (se eliminan y se crean de nuevo). El monto pagado es siempre la cuota; un pago parcial se registra editando el movimiento creado. No hay recordatorios por notificación.
 - El dashboard agrega en el servidor sobre las filas del periodo; si el volumen crece, conviene moverlo a vistas o RPC en SQL.
