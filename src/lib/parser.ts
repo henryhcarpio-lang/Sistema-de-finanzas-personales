@@ -1,6 +1,7 @@
 import { todayLima } from "./dates";
 import { extraerFecha } from "./fechaFrase";
-import { extraerMonto } from "./montos";
+import { clasificar } from "./clasificador";
+import { extraerMonto, normalizarDictado } from "./montos";
 import type { Draft, Naturaleza, Preferencia, Tipo } from "./types";
 
 const norm = (s: string) =>
@@ -17,28 +18,6 @@ function buscarPreferencia(texto: string, prefs: Preferencia[]): Preferencia | u
     .filter((p) => p.keyword && t.includes(` ${p.keyword} `))
     .sort((a, b) => b.keyword.length - a.keyword.length || b.hits - a.hits)[0];
 }
-
-interface Regla {
-  words: string[];
-  category: string;
-  nature: Naturaleza;
-  tag?: string;
-}
-
-const REGLAS: Regla[] = [
-  { words: ["taxi", "uber", "cabify", "indrive"], category: "Transporte", nature: "necesidad", tag: "Taxi" },
-  { words: ["pasaje", "bus", "combi", "metro", "gasolina", "peaje", "movilidad", "colectivo"], category: "Transporte", nature: "necesidad" },
-  { words: ["almuerzo", "menu", "desayuno", "cena", "comida", "restaurante", "cafe", "pollo", "pizza", "chifa"], category: "Almuerzo / comida fuera", nature: "necesidad" },
-  { words: ["supermercado", "plaza vea", "wong", "metro", "tottus", "mercado", "verduras", "frutas"], category: "Supermercado", nature: "necesidad" },
-  { words: ["alquiler", "renta", "hipoteca", "mantenimiento"], category: "Vivienda", nature: "necesidad" },
-  { words: ["luz", "agua", "internet", "gas", "celular", "telefono", "recibo"], category: "Servicios", nature: "necesidad" },
-  { words: ["medicina", "farmacia", "doctor", "consulta", "clinica", "dentista", "pastillas"], category: "Salud", nature: "necesidad" },
-  { words: ["curso", "libro", "universidad", "colegio", "pension", "matricula", "clase"], category: "Educación", nature: "necesidad" },
-  { words: ["cine", "juego", "videojuego", "concierto", "fiesta", "bar", "trago", "salida", "paseo"], category: "Entretenimiento", nature: "deseo" },
-  { words: ["ropa", "zapatillas", "zapatos", "polo", "regalo", "compra", "amazon", "tecnologia"], category: "Compras", nature: "deseo" },
-  { words: ["netflix", "spotify", "suscripcion", "youtube", "disney", "hbo", "gimnasio", "gym", "prime"], category: "Suscripciones", nature: "deseo" },
-  { words: ["oficina", "herramientas", "coworking", "hosting", "dominio"], category: "Trabajo", nature: "necesidad" },
-];
 
 const INGRESO = /\b(deposit|me pagaron|cobre|cobro|sueldo|salario|ingreso|recibi|me transfirieron|me abonaron|honorarios|freelance)/;
 const AHORRO = /\b(separe|ahorre|ahorro|aparte|guarde|fondo de emergencia)/;
@@ -66,7 +45,7 @@ export function parseMovimiento(
   today = todayLima(),
   prefs: Preferencia[] = [],
 ): Draft | null {
-  const input = texto.trim();
+  const input = normalizarDictado(texto);
   if (!input) return null;
   // La fecha va primero: en "el 3 de octubre 50 soles" el 3 no es el monto.
   const conFecha = extraerFecha(input, today);
@@ -102,14 +81,10 @@ export function parseMovimiento(
     // "Banco 500": no asumir si es ingreso, pago de tarjeta o cuota.
     needsType = true; confidence = 0.2; category = "Otros";
   } else {
-    const palabras = new Set(n.split(/[^a-z0-9/]+/));
-    const regla = REGLAS.find((r) =>
-      r.words.some((w) => (w.includes(" ") ? n.includes(w) : palabras.has(w))),
-    );
-    if (regla) {
-      category = regla.category; nature = regla.nature; confidence = 0.85;
-      const hit = regla.words.find((w) => (w.includes(" ") ? n.includes(w) : palabras.has(w)));
-      tags = regla.tag ? [regla.tag] : hit ? [hit.charAt(0).toUpperCase() + hit.slice(1)] : [];
+    const c = clasificar(monto.resto);
+    if (c) {
+      category = c.categoria; nature = c.naturaleza; confidence = 0.85;
+      tags = [c.etiqueta];
     } else {
       nature = "necesidad"; // valor inicial editable; confianza baja
     }

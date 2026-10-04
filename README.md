@@ -21,6 +21,8 @@ Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + 
 - **Instalable:** manifiesto e iconos para "Agregar a la pantalla de inicio" (Android e iPhone).
 - **Fase 2:** categorías editables por usuario (pantalla *Categorías*), con naturaleza por defecto.
 - **Fase 2:** preferencias aprendidas: si corriges tipo, categoría o naturaleza (al registrar o al editar), la app lo recuerda para ese concepto y lo usa con prioridad sobre las reglas. La tarjeta de confirmación indica la confianza.
+- **Voz más confiable (iPhone/Safari):** escucha en modo continuo y termina tras 1,6 s de silencio; evalúa hasta 5 interpretaciones y usa la que tiene sentido como gasto; evita duplicados de Safari; reintenta solo si el micrófono no arranca; corrige errores típicos ("pesos", "$", "un sol 20"). Si la voz falla, sugiere el dictado del teclado.
+- **Clasificación ampliada:** ~250 conceptos peruanos con naturaleza por concepto (menú = necesidad; pollo a la brasa, delivery, gaseosa = deseo), gana el concepto más específico y se toleran plurales y tildes (`src/lib/clasificador.ts`).
 - **Fase 3:** registro por voz. Botón de micrófono con estados *escuchando* (transcripción en vivo), *procesando*, tarjeta de confirmación y *error*. Termina solo tras una pausa (o con *Terminar*, máximo 10 s). Entiende números dictados ("treinta y cinco soles", "dos mil quinientos", "dieciocho soles con cincuenta"). Los movimientos se guardan con fuente `voz`.
 
 ## Uso diario

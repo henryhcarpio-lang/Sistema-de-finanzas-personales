@@ -65,3 +65,19 @@ describe("montos pequeños y dictados", () => {
     expect(parseMovimiento("dos veinte soles", "2026-10-04")?.amount).not.toBe(2.2);
   });
 });
+
+describe("errores típicos del dictado", () => {
+  it.each([
+    ["un sol 20 pasaje", 1.2, "Pasaje"],
+    ["dos soles 40 pasaje", 2.4, "Pasaje"],
+    ["18 pesos taxi", 18, "Taxi"],
+    ["$18 taxi", 18, "Taxi"],
+    ["S /18 taxi", 18, "Taxi"],
+    ["18 solos taxi", 18, "Taxi"],
+    ["3.50 soles. pan", 3.5, "Pan"],
+  ])("%s → %d", (frase, monto, concepto) => {
+    const d = parseMovimiento(frase as string, "2026-10-04");
+    expect(d?.amount).toBe(monto);
+    expect(d?.concept).toBe(concepto);
+  });
+});

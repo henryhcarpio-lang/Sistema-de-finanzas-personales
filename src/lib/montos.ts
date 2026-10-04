@@ -131,8 +131,9 @@ export function extraerMonto(texto: string): { amount: number; resto: string } |
       if (t[i] === "medio" && esSol(t[i + 1])) return resultado(i, i + 2, 0.5);
       const n = leerNumero(t, i);
       if (!n || (soloDigitos && n.digitos === null) || (!soloDigitos && n.digitos !== null)) continue;
-      // En "un sol con 5" el 5 son los céntimos del "un sol" en palabras, no el monto.
+      // En "un sol con 5" o "un sol 20" el número son los céntimos del "un sol" en palabras.
       if (soloDigitos && t[i - 1] === "con" && (esSol(t[i - 2]) || (t[i - 2] ?? "") in PALABRAS)) continue;
+      if (soloDigitos && esSol(t[i - 1]) && (t[i - 2] ?? "") in PALABRAS && n.valor < 100) continue;
       let fin = n.fin;
       // "60 céntimos"
       if (esCentimo(t[fin]) && n.valor < 100 && Number.isInteger(n.valor)) return resultado(i, fin + 1, n.valor / 100);
@@ -148,4 +149,18 @@ export function extraerMonto(texto: string): { amount: number; resto: string } |
     }
   }
   return null;
+}
+
+/**
+ * Corrige errores típicos del dictado antes de interpretar:
+ * "pesos"/"solos"/"zoles" → "soles", "$" → "S/", "S /" → "S/".
+ */
+export function normalizarDictado(texto: string): string {
+  return texto
+    .replace(/\$\s*/g, "S/ ")
+    .replace(/\bs\s*\/\s*\.?/gi, "S/ ")
+    .replace(/(?<![\p{L}])(pesos?|solos|zoles)(?![\p{L}])/giu, "soles")
+    .replace(/(?<![\p{L}])sol es(?![\p{L}])/giu, "soles")
+    .replace(/\s+/g, " ")
+    .trim();
 }

@@ -12,14 +12,14 @@ const fake = () => {
       setTimeout(() => {
         if (error) { this.onerror?.({ error }); this.onend?.(); return; }
         const parcial = frase.split(" ").slice(0, 2).join(" ");
-        this.onresult?.({ resultIndex: 0, results: [{ isFinal: false, 0: { transcript: parcial } }] });
+        this.onresult?.({ resultIndex: 0, results: [{ isFinal: false, length: 1, 0: { transcript: parcial } }] });
       }, 300);
       if (!error) this._t = setTimeout(() => {
-        this.onresult?.({ resultIndex: 0, results: [{ isFinal: true, 0: { transcript: frase } }] });
+        this.onresult?.({ resultIndex: 0, results: [{ isFinal: true, length: 1, 0: { transcript: frase } }] });
         this.onend?.();
       }, 1500);
     }
-    stop() { clearTimeout(this._t); this.onresult?.({ resultIndex: 0, results: [{ isFinal: true, 0: { transcript: window.__voz.frase } }] }); this.onend?.(); }
+    stop() { clearTimeout(this._t); this.onresult?.({ resultIndex: 0, results: [{ isFinal: true, length: 1, 0: { transcript: window.__voz.frase } }] }); this.onend?.(); }
     abort() { clearTimeout(this._t); this.onerror?.({ error: "aborted" }); this.onend?.(); }
   }
   window.webkitSpeechRecognition = FakeRec;

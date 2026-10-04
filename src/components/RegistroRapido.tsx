@@ -4,6 +4,7 @@ import { useRef, useState, useTransition } from "react";
 import { useVozRegistro } from "@/hooks/useVozRegistro";
 import { crearMovimiento } from "@/app/actions";
 import { parseMovimiento } from "@/lib/parser";
+import { elegirCandidata } from "@/lib/transcripcion";
 import { etiquetaFecha, soles, todayLima } from "@/lib/dates";
 import type { Categoria, Draft, Fuente, Preferencia } from "@/lib/types";
 import { MovimientoFields, camposAInput, type Campos } from "./MovimientoFields";
@@ -53,7 +54,9 @@ export function RegistroRapido({ prefs, categorias }: { prefs: Preferencia[]; ca
     setEstado({ k: "confirmar", draft, source });
   }
 
-  const voz = useVozRegistro((frase) => interpretar(frase, "voz"));
+  // De las interpretaciones del reconocedor, se usa la que tiene sentido como movimiento.
+  const voz = useVozRegistro((candidatas) =>
+    interpretar(elegirCandidata(candidatas, (c) => parseMovimiento(c, todayLima(), prefs)).texto, "voz"));
 
   function guardar(c: Campos, source: Fuente, confidence: number | null, sugerido?: Campos) {
     const r = camposAInput(c);
