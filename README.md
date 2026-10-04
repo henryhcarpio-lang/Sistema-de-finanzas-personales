@@ -16,6 +16,7 @@ Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + 
 - **Fase 5:** dashboard avanzado: gráfico de gasto por día (por mes en el periodo Año) con tooltip, foco con teclado y vista de tabla; reparto necesidades / deseos / deudas; proyección del gasto al cierre del mes; variación por categoría y total frente al periodo anterior.
 - **Fase 6:** presupuestos mensuales por categoría (sobres): gastado, disponible, % usado y proyección; estados *en orden*, *en riesgo* (la proyección supera el límite), *cerca del límite* (≥ 80 %) y *excedido*, siempre con icono y texto. Al registrar un gasto con presupuesto, la app dice cuánto queda. Nunca bloquea un gasto.
 - **Fase 7:** deudas y pagos recurrentes (pestaña *Pagos*). Cuotas mensuales, semanales o anuales calculadas a partir de cada compromiso; vencidas, de hoy y próximas; botón **Pagar** que crea el movimiento real vinculado a la cuota (una cuota futura nunca cuenta como gasto, y no se puede pagar dos veces). Deudas con saldo, cuotas pagadas/total, acreedor y tasa. El dashboard muestra los próximos compromisos de 7 días.
+- **Ver un día específico:** periodos *Ayer* y *Día* (con navegación ‹ › día a día y selector de fecha) en Movimientos y Dashboard; los demás filtros se conservan al cambiar de día.
 - **Fechas en la frase:** "ayer 18 soles taxi", "anteayer…", "hace 3 días…", "el lunes…", "el 3 de octubre…", "el día 10…". La tarjeta muestra la fecha detectada.
 - **Instalable:** manifiesto e iconos para "Agregar a la pantalla de inicio" (Android e iPhone).
 - **Fase 2:** categorías editables por usuario (pantalla *Categorías*), con naturaleza por defecto.
@@ -28,7 +29,7 @@ Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + 
 2. **Registrar:** toca el micrófono y di "dieciocho soles taxi", o escríbelo. ¿Te olvidaste ayer? Di "ayer dieciocho soles taxi". Revisa la tarjeta y pulsa **Confirmar**.
 3. Si la categoría no es la correcta, pulsa **Editar** y corrígela: la próxima vez la app lo recordará.
 4. **Dashboard:** cómo vas en el mes, proyección de cierre y en qué estás gastando (toca una categoría para ver su detalle).
-5. **Movimientos:** busca, filtra y agrupa para responder "¿cuánto gasté en…?".
+5. **Movimientos:** busca, filtra y agrupa para responder "¿cuánto gasté en…?". Para un día concreto toca **Ayer** o **Día** y muévete con ‹ › o elige la fecha.
 6. **Presupuestos:** define un límite mensual para tus categorías principales; la app te avisa al acercarte.
 7. **Pagos:** registra una vez tus préstamos, tarjetas y pagos fijos; cuando pagues una cuota, pulsa **Pagar** y queda registrada como gasto.
 

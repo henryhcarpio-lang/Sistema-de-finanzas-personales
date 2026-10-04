@@ -4,7 +4,7 @@ import { GraficoGasto } from "@/components/GraficoGasto";
 import { PeriodoSelector, leerPeriodo } from "@/components/PeriodoSelector";
 import { compararCategorias, proyeccionMes, serieGasto } from "@/lib/analisis";
 import { calendario } from "@/lib/compromisos";
-import { PERIODOS, periodoAnterior, rangoPeriodo, soles, todayLima } from "@/lib/dates";
+import { esUnDia, frasePeriodo, periodoAnterior, resolverPeriodo, soles, todayLima } from "@/lib/dates";
 import { CuotaFila } from "@/components/CuotaFila";
 import { BarraSobre, DetalleSobre } from "@/components/EstadoSobre";
 import { listarCompromisos, listarMovimientos, listarPagos, listarPresupuestos, resumir } from "@/lib/queries";
@@ -13,9 +13,8 @@ const str = (v: string | string[] | undefined) => (typeof v === "string" ? v : u
 
 export default async function DashboardPage({ searchParams }: PageProps<"/dashboard">) {
   const sp = await searchParams;
-  const p = leerPeriodo(sp.p);
   const hoy = todayLima();
-  const rango = rangoPeriodo(p, hoy, { from: str(sp.from), to: str(sp.to) });
+  const { p, rango } = resolverPeriodo(leerPeriodo(sp.p), hoy, { from: str(sp.from), to: str(sp.to), d: str(sp.d) });
   const [txs, prev, presupuestos, compromisos, pagos] = await Promise.all([
     listarMovimientos({ rango }),
     listarMovimientos({ rango: periodoAnterior(rango) }),
@@ -33,9 +32,9 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   const proyeccion = p === "mes" ? proyeccionMes(r.gastos, rango, hoy) : null;
   const categorias = compararCategorias(txs, prev);
   const maxCat = categorias[0]?.actual ?? 0;
-  const periodoTxt = PERIODOS.find((x) => x.v === p)!.frase;
+  const periodoTxt = frasePeriodo(p, rango);
   const qsCat = (cat: string) =>
-    new URLSearchParams({ p, ...(p === "rango" ? { from: rango.from, to: rango.to } : {}), cat }).toString();
+    new URLSearchParams({ p, ...(p === "rango" ? { from: rango.from, to: rango.to } : {}), ...(p === "dia" ? { d: rango.from } : {}), cat }).toString();
 
   return (
     <div className="space-y-5">
@@ -108,10 +107,13 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
         </section>
       )}
 
-      <section className="card p-4">
-        <h2 className="mb-3 text-sm font-semibold">Gasto por {serie.punto === "dia" ? "día" : "mes"}</h2>
-        <GraficoGasto datos={serie.datos} punto={serie.punto} />
-      </section>
+      {/* En un solo día el gráfico tendría una barra: no aporta. */}
+      {!esUnDia(p) && (
+        <section className="card p-4">
+          <h2 className="mb-3 text-sm font-semibold">Gasto por {serie.punto === "dia" ? "día" : "mes"}</h2>
+          <GraficoGasto datos={serie.datos} punto={serie.punto} />
+        </section>
+      )}
 
       <section className="card p-4">
         <h2 className="mb-3 text-sm font-semibold">Necesidades, deseos y deudas</h2>

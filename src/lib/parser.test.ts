@@ -95,3 +95,10 @@ describe("números dictados (voz)", () => {
     expect(parseMovimiento("dos pasajes", T)).toBeNull();
   });
 });
+
+describe("periodoAnterior de un día", () => {
+  it("compara con el día previo", async () => {
+    const { periodoAnterior } = await import("./dates");
+    expect(periodoAnterior({ from: "2026-10-03", to: "2026-10-03" })).toEqual({ from: "2026-10-02", to: "2026-10-02" });
+  });
+});

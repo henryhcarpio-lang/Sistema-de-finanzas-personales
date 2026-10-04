@@ -1,4 +1,4 @@
-import { PERIODOS, rangoPeriodo, todayLima, type Periodo, type Rango } from "./dates";
+import { PERIODOS, frasePeriodo, resolverPeriodo, todayLima, type Periodo, type Rango } from "./dates";
 import { NATURALEZAS, TIPOS, type Naturaleza, type Tipo, type Transaction } from "./types";
 
 export const AGRUPACIONES = ["dia", "categoria", "etiqueta"] as const;
@@ -34,13 +34,15 @@ const de = <T extends string>(lista: readonly T[], v: string | string[] | undefi
 
 /** Lee los filtros desde la URL; cualquier valor inválido se ignora. */
 export function leerFiltros(sp: Params, today = todayLima(), def: Periodo = "mes"): Filtros {
-  const p = de(PERIODOS.map((x) => x.v), sp.p) ?? def;
+  const { p, rango } = resolverPeriodo(de(PERIODOS.map((x) => x.v), sp.p) ?? def, today, {
+    from: fecha(sp.from), to: fecha(sp.to), d: fecha(sp.d),
+  });
   let min = monto(sp.min);
   let max = monto(sp.max);
   if (min !== undefined && max !== undefined && min > max) [min, max] = [max, min];
   return {
     p,
-    rango: rangoPeriodo(p, today, { from: fecha(sp.from), to: fecha(sp.to) }),
+    rango,
     cat: str(sp.cat),
     tipo: de(TIPOS, sp.tipo),
     nat: de(NATURALEZAS, sp.nat),
@@ -58,6 +60,7 @@ export function aQuery(f: Filtros, cambios: Partial<Record<keyof Filtros, string
     p: f.p,
     from: f.p === "rango" ? f.rango.from : undefined,
     to: f.p === "rango" ? f.rango.to : undefined,
+    d: f.p === "dia" ? f.rango.from : undefined,
     cat: f.cat, tipo: f.tipo, nat: f.nat, tag: f.tag, min: f.min, max: f.max, q: f.q,
     agrupar: f.agrupar === "dia" ? undefined : f.agrupar,
   };
@@ -84,7 +87,7 @@ export function filtrosActivos(f: Filtros): { clave: keyof Filtros; texto: strin
 
 /** Frase que responde la pregunta del usuario, p. ej. "Gastaste S/ 120.00 en Almuerzo este mes". */
 export function fraseResumen(f: Filtros, r: { gastos: number; ingresos: number; ahorro: number }, fmt: (n: number) => string): string {
-  const periodo = PERIODOS.find((x) => x.v === f.p)!.frase;
+  const periodo = frasePeriodo(f.p, f.rango);
   const sobre = [f.cat, f.tag && `#${f.tag}`, f.q && `“${f.q}”`, f.nat && `${f.nat}s`].filter(Boolean).join(" · ");
   const en = sobre ? ` en ${sobre}` : "";
   if (f.tipo === "ingreso") return `Recibiste ${fmt(r.ingresos)}${en} ${periodo}.`;

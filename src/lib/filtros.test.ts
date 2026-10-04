@@ -74,3 +74,24 @@ describe("agrupar", () => {
     expect(agrupar(txs, "etiqueta", T).map((x) => x.titulo)).toEqual(["(sin etiqueta)", "#Taxi", "#Pasaje"]);
   });
 });
+
+describe("día específico", () => {
+  it("Ayer: solo el día anterior", () => {
+    expect(leerFiltros({ p: "ayer" }, T)).toMatchObject({ p: "ayer", rango: { from: "2026-10-03", to: "2026-10-03" } });
+  });
+  it("Día elegido, con su frase y su query", () => {
+    const f = leerFiltros({ p: "dia", d: "2026-09-28", cat: "Transporte" }, T);
+    expect(f).toMatchObject({ p: "dia", rango: { from: "2026-09-28", to: "2026-09-28" } });
+    expect(aQuery(f)).toBe("p=dia&d=2026-09-28&cat=Transporte");
+    expect(fraseResumen(f, { gastos: 19, ingresos: 0, ahorro: 0 }, (n) => `S/ ${n.toFixed(2)}`))
+      .toBe("Gastaste S/ 19.00 en Transporte el lun 28/09.");
+  });
+  it("un día que es hoy o ayer se muestra como Hoy / Ayer", () => {
+    expect(leerFiltros({ p: "dia", d: T }, T).p).toBe("hoy");
+    expect(leerFiltros({ p: "dia", d: "2026-10-03" }, T).p).toBe("ayer");
+  });
+  it("fechas futuras o inválidas → hoy", () => {
+    expect(leerFiltros({ p: "dia", d: "2026-12-25" }, T)).toMatchObject({ p: "hoy", rango: { from: T, to: T } });
+    expect(leerFiltros({ p: "dia", d: "ayer" }, T).rango.from).toBe(T);
+  });
+});
