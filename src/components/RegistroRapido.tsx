@@ -26,7 +26,7 @@ const draftACampos = (d: Draft): Campos => ({
 export function RegistroRapido({ prefs, categorias }: { prefs: Preferencia[]; categorias: Categoria[] }) {
   const [texto, setTexto] = useState("");
   const [estado, setEstado] = useState<Estado>({ k: "idle" });
-  const [aviso, setAviso] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [aviso, setAviso] = useState<{ ok: boolean; msg: string; extra?: { texto: string; nivel: string } } | null>(null);
   const [pending, start] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -65,7 +65,7 @@ export function RegistroRapido({ prefs, categorias }: { prefs: Preferencia[]; ca
       if (!res.ok) return setAviso({ ok: false, msg: res.error });
       const hoy = todayLima();
       const cuando = r.input.occurred_on === hoy ? "" : ` · ${etiquetaFecha(r.input.occurred_on, hoy)}`;
-      setAviso({ ok: true, msg: `Registrado: ${r.input.concept} · ${soles(r.input.amount)}${cuando}` });
+      setAviso({ ok: true, msg: `Registrado: ${r.input.concept} · ${soles(r.input.amount)}${cuando}`, extra: res.presupuesto });
       setEstado({ k: "idle" });
       setTexto("");
       inputRef.current?.focus();
@@ -95,6 +95,11 @@ export function RegistroRapido({ prefs, categorias }: { prefs: Preferencia[]; ca
       {aviso && (
         <p role="status" className={`pop-in rounded-xl px-3 py-2 text-sm ${aviso.ok ? "bg-pos/10 text-pos" : "bg-neg/10 text-neg"}`}>
           {aviso.ok ? "✓ " : ""}{aviso.msg}
+          {aviso.extra && (
+            <span data-testid="aviso-presupuesto" className={`mt-1 block text-xs font-medium ${aviso.extra.nivel === "excedido" ? "text-neg" : aviso.extra.nivel === "ok" ? "text-fg/70" : "text-warn"}`}>
+              <span aria-hidden>{aviso.extra.nivel === "excedido" ? "✕ " : aviso.extra.nivel === "ok" ? "" : "! "}</span>{aviso.extra.texto}
+            </span>
+          )}
         </p>
       )}
 

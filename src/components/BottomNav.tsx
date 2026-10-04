@@ -7,6 +7,7 @@ const ITEMS = [
   { href: "/", label: "Registrar", icon: "M12 5v14M5 12h14" },
   { href: "/dashboard", label: "Dashboard", icon: "M4 19V10M10 19V5M16 19v-6M22 19H2" },
   { href: "/movimientos", label: "Movimientos", icon: "M4 6h16M4 12h16M4 18h10" },
+  { href: "/presupuestos", label: "Presupuestos", icon: "M3 7h18v12H3zM3 7l3-3h12l3 3M12 11v4M10 13h4" },
 ];
 
 export function BottomNav() {
@@ -24,7 +25,7 @@ export function BottomNav() {
               <Link
                 href={it.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-h-14 min-w-20 flex-col items-center justify-center gap-0.5 rounded-xl px-3 text-[11px] font-medium transition md:min-h-10 md:flex-row md:gap-2 md:text-sm ${
+                className={`flex min-h-14 min-w-16 flex-col items-center justify-center gap-0.5 rounded-xl px-3 text-[11px] font-medium transition md:min-h-10 md:flex-row md:gap-2 md:text-sm ${
                   active ? "text-brand" : "text-muted hover:text-fg"
                 }`}
               >

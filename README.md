@@ -4,7 +4,7 @@ App web mobile-first para registrar movimientos en ~5 segundos: **hablar o escri
 
 Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + Postgres con RLS) · Vercel.
 
-## Estado: Fases 1 a 5 completadas
+## Estado: Fases 1 a 6 completadas
 
 - Registro por texto en lenguaje natural ("un sol pasaje", "me depositaron 2,500 soles") con tarjeta **Confirmar | Editar**.
 - Clasificación inicial por reglas (tipo, categoría, naturaleza, etiquetas, confianza). Las frases ambiguas ("Banco 500") piden el tipo.
@@ -14,6 +14,9 @@ Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + 
 - Dashboard: ingresos, gastos, balance, ahorro, necesidades/deseos/deudas, gasto por categoría y comparación con el periodo anterior.
 - Autenticación por correo y contraseña; los datos de cada usuario están aislados con RLS.
 - **Fase 5:** dashboard avanzado: gráfico de gasto por día (por mes en el periodo Año) con tooltip, foco con teclado y vista de tabla; reparto necesidades / deseos / deudas; proyección del gasto al cierre del mes; variación por categoría y total frente al periodo anterior.
+- **Fase 6:** presupuestos mensuales por categoría (sobres): gastado, disponible, % usado y proyección; estados *en orden*, *en riesgo* (la proyección supera el límite), *cerca del límite* (≥ 80 %) y *excedido*, siempre con icono y texto. Al registrar un gasto con presupuesto, la app dice cuánto queda. Nunca bloquea un gasto.
+- **Fechas en la frase:** "ayer 18 soles taxi", "anteayer…", "hace 3 días…", "el lunes…", "el 3 de octubre…", "el día 10…". La tarjeta muestra la fecha detectada.
+- **Instalable:** manifiesto e iconos para "Agregar a la pantalla de inicio" (Android e iPhone).
 - **Fase 2:** categorías editables por usuario (pantalla *Categorías*), con naturaleza por defecto.
 - **Fase 2:** preferencias aprendidas: si corriges tipo, categoría o naturaleza (al registrar o al editar), la app lo recuerda para ese concepto y lo usa con prioridad sobre las reglas. La tarjeta de confirmación indica la confianza.
 - **Fase 3:** registro por voz. Botón de micrófono con estados *escuchando* (transcripción en vivo), *procesando*, tarjeta de confirmación y *error*. Termina solo tras una pausa (o con *Terminar*, máximo 10 s). Entiende números dictados ("treinta y cinco soles", "dos mil quinientos", "dieciocho soles con cincuenta"). Los movimientos se guardan con fuente `voz`.
@@ -21,10 +24,11 @@ Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + 
 ## Uso diario
 
 1. Abre https://finanzas-personales-pun8.vercel.app en el celular y, en el menú del navegador, elige **"Agregar a la pantalla de inicio"**: queda como una app.
-2. **Registrar:** toca el micrófono y di "dieciocho soles taxi", o escríbelo. Revisa la tarjeta y pulsa **Confirmar**.
+2. **Registrar:** toca el micrófono y di "dieciocho soles taxi", o escríbelo. ¿Te olvidaste ayer? Di "ayer dieciocho soles taxi". Revisa la tarjeta y pulsa **Confirmar**.
 3. Si la categoría no es la correcta, pulsa **Editar** y corrígela: la próxima vez la app lo recordará.
 4. **Dashboard:** cómo vas en el mes, proyección de cierre y en qué estás gastando (toca una categoría para ver su detalle).
 5. **Movimientos:** busca, filtra y agrupa para responder "¿cuánto gasté en…?".
+6. **Presupuestos:** define un límite mensual para tus categorías principales; la app te avisa al acercarte.
 
 ## Producción
 
@@ -33,7 +37,7 @@ Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + 
 
 ## Configuración
 
-Proyecto Supabase: `finanzas-personales` (ref `gjcwiwmqgqlhuquyieia`, región sa-east-1). Las migraciones de `supabase/migrations/` (0001 y 0002) ya están aplicadas.
+Proyecto Supabase: `finanzas-personales` (ref `gjcwiwmqgqlhuquyieia`, región sa-east-1). Las migraciones de `supabase/migrations/` (0001 a 0003) ya están aplicadas.
 
 1. Copia `.env.example` a `.env.local`; ya incluye la URL y la clave publicable del proyecto:
 
@@ -74,6 +78,8 @@ Necesitan una cuenta de prueba confirmada en Supabase y `.env.local`. Opcional: 
 
 - Renombrar una categoría todavía no está soportado (crear + eliminar). Los movimientos guardan el nombre de la categoría como texto.
 - Las etiquetas aún no se aprenden de las correcciones.
+- Los presupuestos son mensuales; periodos semanales o anuales quedan para más adelante.
+- La app es instalable pero aún no funciona sin conexión (no hay service worker).
 - Voz: si en el futuro se necesita soporte en Firefox o más precisión, se puede cambiar a transcripción en el servidor (p. ej. Whisper); el componente solo entrega texto a `parseMovimiento`.
 - Cuentas y deudas solo existen como campo/tipo; sus tablas llegan en fases posteriores. "Próximos compromisos" del dashboard depende de la Fase 7 (deudas y recurrentes).
 - El dashboard agrega en el servidor sobre las filas del periodo; si el volumen crece, conviene moverlo a vistas o RPC en SQL.

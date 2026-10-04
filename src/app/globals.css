@@ -11,6 +11,7 @@
   --pos: #059669;
   --neg: #dc2626;
   /* Series de datos (paleta validada para daltonismo; ver skill dataviz) */
+  --warn: #b45309;
   --serie-1: #2a78d6;
   --serie-2: #eb6834;
   --serie-3: #1baf7a;
@@ -27,6 +28,7 @@
     --brand-fg: #04201d;
     --pos: #34d399;
     --neg: #f87171;
+    --warn: #fbbf24;
     --serie-1: #3987e5;
     --serie-2: #d95926;
     --serie-3: #199e70;
@@ -43,6 +45,7 @@
   --color-brand-fg: var(--brand-fg);
   --color-pos: var(--pos);
   --color-neg: var(--neg);
+  --color-warn: var(--warn);
   --color-serie-1: var(--serie-1);
   --color-serie-2: var(--serie-2);
   --color-serie-3: var(--serie-3);

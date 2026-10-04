@@ -1,6 +1,7 @@
 import "server-only";
 import { requireUser } from "./supabase/server";
-import type { Rango } from "./dates";
+import { rangoPeriodo, todayLima, type Rango } from "./dates";
+import { estadoPresupuesto, type EstadoPresupuesto } from "./presupuestos";
 import { CATEGORIAS, NATURALEZA_INICIAL, type Categoria, type Preferencia, type Transaction } from "./types";
 
 const COLS =
@@ -102,4 +103,39 @@ export async function listarPreferencias(): Promise<Preferencia[]> {
     .order("hits", { ascending: false })
     .limit(500);
   return (data ?? []) as Preferencia[];
+}
+
+export interface Presupuesto {
+  id: string;
+  category: string;
+  monthly_limit: number;
+}
+
+export type PresupuestoConEstado = Presupuesto & { estado: EstadoPresupuesto };
+
+/** Mes en curso (Lima): rango, día actual y días del mes. */
+export function mesActual(today = todayLima()) {
+  const rango = rangoPeriodo("mes", today);
+  return { rango, dia: Number(today.slice(8, 10)), diasMes: Number(rango.to.slice(8, 10)) };
+}
+
+/** Presupuestos del usuario con lo gastado en el mes en curso, los más comprometidos primero. */
+export async function listarPresupuestos(): Promise<PresupuestoConEstado[]> {
+  const { supabase } = await requireUser();
+  const { rango, dia, diasMes } = mesActual();
+  const [{ data: budgets, error }, txs] = await Promise.all([
+    supabase.from("fin_budgets").select("id,category,monthly_limit").order("category"),
+    listarMovimientos({ rango }),
+  ]);
+  if (error) throw new Error("No se pudieron cargar los presupuestos");
+  const gastado = new Map<string, number>();
+  for (const t of txs) {
+    if (t.type === "egreso" || t.type === "deuda") gastado.set(t.category, (gastado.get(t.category) ?? 0) + t.amount);
+  }
+  return (budgets ?? [])
+    .map((b) => {
+      const limite = Number(b.monthly_limit);
+      return { ...b, monthly_limit: limite, estado: estadoPresupuesto(limite, gastado.get(b.category) ?? 0, dia, diasMes) };
+    })
+    .sort((a, b) => b.estado.porcentaje - a.estado.porcentaje);
 }

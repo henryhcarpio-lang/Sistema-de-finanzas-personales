@@ -4,7 +4,8 @@ import { GraficoGasto } from "@/components/GraficoGasto";
 import { PeriodoSelector, leerPeriodo } from "@/components/PeriodoSelector";
 import { compararCategorias, proyeccionMes, serieGasto } from "@/lib/analisis";
 import { PERIODOS, periodoAnterior, rangoPeriodo, soles, todayLima } from "@/lib/dates";
-import { listarMovimientos, resumir } from "@/lib/queries";
+import { BarraSobre, DetalleSobre } from "@/components/EstadoSobre";
+import { listarMovimientos, listarPresupuestos, resumir } from "@/lib/queries";
 
 const str = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined);
 
@@ -13,10 +14,12 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   const p = leerPeriodo(sp.p);
   const hoy = todayLima();
   const rango = rangoPeriodo(p, hoy, { from: str(sp.from), to: str(sp.to) });
-  const [txs, prev] = await Promise.all([
+  const [txs, prev, presupuestos] = await Promise.all([
     listarMovimientos({ rango }),
     listarMovimientos({ rango: periodoAnterior(rango) }),
+    listarPresupuestos(),
   ]);
+  const enAlerta = presupuestos.filter((x) => x.estado.nivel !== "ok").slice(0, 3);
   const r = resumir(txs);
   const gastoPrev = resumir(prev).gastos;
   const delta = gastoPrev > 0 ? Math.round(((r.gastos - gastoPrev) / gastoPrev) * 100) : null;
@@ -56,6 +59,26 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
               </span>{" "}
               que en el periodo anterior ({soles(gastoPrev)}).
             </p>
+          )}
+        </section>
+      )}
+
+      {presupuestos.length > 0 && (
+        <section className="card space-y-3 p-4" aria-label="Presupuestos del mes">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-sm font-semibold">Presupuestos de este mes</h2>
+            <Link href="/presupuestos" className="text-xs text-muted hover:text-fg">Ver todos ›</Link>
+          </div>
+          {enAlerta.length === 0 ? (
+            <p className="text-sm text-pos"><span aria-hidden>✓</span> Todos tus presupuestos están en orden.</p>
+          ) : (
+            enAlerta.map((x) => (
+              <div key={x.id} className="space-y-1.5">
+                <div className="flex justify-between text-sm"><span>{x.category}</span><span className="tabular-nums text-muted">{x.estado.porcentaje} %</span></div>
+                <BarraSobre e={x.estado} />
+                <DetalleSobre e={x.estado} />
+              </div>
+            ))
           )}
         </section>
       )}
