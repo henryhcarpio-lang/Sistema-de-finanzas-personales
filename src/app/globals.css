@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --fg: #0f172a;
+  --muted: #64748b;
+  --line: #e5e7eb;
+  --brand: #0d9488;
+  --brand-fg: #ffffff;
+  --pos: #059669;
+  --neg: #dc2626;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b0f14;
+    --surface: #131a22;
+    --fg: #e6edf3;
+    --muted: #8b98a5;
+    --line: #233040;
+    --brand: #2dd4bf;
+    --brand-fg: #04201d;
+    --pos: #34d399;
+    --neg: #f87171;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-brand-fg: var(--brand-fg);
+  --color-pos: var(--pos);
+  --color-neg: var(--neg);
+  --font-sans: var(--font-geist-sans);
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@utility card {
+  @apply rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.04)];
+}
+@utility btn {
+  @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-50;
+}
+@utility btn-primary { @apply btn bg-brand text-brand-fg; }
+@utility btn-ghost { @apply btn border border-line bg-surface text-fg; }
+@utility field {
+  @apply min-h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-fg outline-none focus:border-brand focus:ring-2 focus:ring-brand/20;
+}
+@utility label { @apply mb-1 block text-xs font-medium text-muted; }
+
+@keyframes pop-in { from { opacity: 0; transform: translateY(6px) scale(0.98); } to { opacity: 1; transform: none; } }
+.pop-in { animation: pop-in 160ms ease-out; }
