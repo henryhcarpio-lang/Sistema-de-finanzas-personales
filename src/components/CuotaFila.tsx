@@ -32,7 +32,7 @@ export function CuotaFila({ cuota }: { cuota: Cuota }) {
       <div className="flex shrink-0 items-center gap-2">
         <span className="text-sm font-semibold tabular-nums">{soles(c.amount)}</span>
         {cuota.estado !== "pagada" && (
-          <button className="btn-primary min-h-9 px-3" disabled={pending} aria-label={`Pagar ${c.name} del ${cuota.fecha}`}
+          <button className="btn-primary min-h-11 px-3" disabled={pending} aria-label={`Pagar ${c.name} del ${cuota.fecha}`}
             onClick={() => start(async () => {
               setError(null);
               const r = await pagarCuota(c.id, cuota.fecha);

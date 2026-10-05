@@ -54,9 +54,9 @@ export function GestorPresupuestos({ presupuestos, categorias }: { presupuestos:
                 <Link href={`/movimientos?p=mes&cat=${encodeURIComponent(p.category)}`} className="truncate font-semibold hover:underline">{p.category}</Link>
                 {editando?.id === p.id ? (
                   <form className="flex items-center gap-1" onSubmit={(e) => { e.preventDefault(); guardar(p.category, editando.monto, () => setEditando(null)); }}>
-                    <input autoFocus className="field h-9 min-h-9 w-24 text-sm tabular-nums" inputMode="decimal" aria-label={`Nuevo límite de ${p.category}`}
+                    <input autoFocus className="field w-28 tabular-nums" inputMode="decimal" aria-label={`Nuevo límite de ${p.category}`}
                       value={editando.monto} onChange={(e) => setEditando({ id: p.id, monto: e.target.value })} />
-                    <button className="btn-primary min-h-9 px-3" disabled={pending}>OK</button>
+                    <button className="btn-primary min-h-11 px-3" disabled={pending}>OK</button>
                   </form>
                 ) : (
                   <button className="shrink-0 text-sm tabular-nums" aria-label={`Editar límite de ${p.category}`}
@@ -70,13 +70,13 @@ export function GestorPresupuestos({ presupuestos, categorias }: { presupuestos:
               {borrando === p.id ? (
                 <div className="flex items-center justify-end gap-2 text-sm">
                   <span className="text-muted">¿Quitar este presupuesto?</span>
-                  <button className="btn-ghost min-h-9" onClick={() => setBorrando(null)}>No</button>
-                  <button className="btn min-h-9 bg-neg text-white" disabled={pending}
+                  <button className="btn-ghost min-h-11" onClick={() => setBorrando(null)}>No</button>
+                  <button className="btn min-h-11 bg-neg text-white" disabled={pending}
                     onClick={() => start(async () => { const r = await eliminarPresupuesto(p.id); if (!r.ok) setError(r.error); setBorrando(null); })}>Quitar</button>
                 </div>
               ) : (
                 <div className="text-right">
-                  <button className="text-xs text-muted hover:text-neg" onClick={() => setBorrando(p.id)} aria-label={`Quitar presupuesto de ${p.category}`}>Quitar</button>
+                  <button className="tap -mr-3 text-muted hover:text-neg" onClick={() => setBorrando(p.id)} aria-label={`Quitar presupuesto de ${p.category}`}>Quitar</button>
                 </div>
               )}
             </li>

@@ -110,13 +110,13 @@ export function RegistroRapido({ prefs, categorias }: { prefs: Preferencia[]; ca
         <div className="card pop-in space-y-4 p-4">
           <div className="flex items-baseline justify-between gap-3">
             <div className="min-w-0">
-              <p className="truncate text-lg font-semibold">{estado.draft.concept}</p>
+              <p className="truncate text-xl font-semibold">{estado.draft.concept}</p>
               <p className="text-xs text-muted capitalize">
                 {estado.draft.type} · {estado.draft.category}
                 {estado.draft.nature && ` · ${estado.draft.nature}`}
               </p>
             </div>
-            <p className={`text-2xl font-bold tabular-nums ${estado.draft.type === "ingreso" ? "text-pos" : ""}`}>
+            <p className={`shrink-0 text-3xl font-bold tabular-nums ${estado.draft.type === "ingreso" ? "text-pos" : ""}`}>
               {soles(estado.draft.amount)}
             </p>
           </div>
@@ -133,7 +133,7 @@ export function RegistroRapido({ prefs, categorias }: { prefs: Preferencia[]; ca
               ))}
             </div>
           )}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             <button className="btn-ghost" disabled={pending}
               onClick={() => setEstado({ k: "editar", campos: draftACampos(estado.draft), source: estado.source, confidence: estado.draft.confidence, sugerido: draftACampos(estado.draft) })}>
               Editar
@@ -149,7 +149,7 @@ export function RegistroRapido({ prefs, categorias }: { prefs: Preferencia[]; ca
       {estado.k === "editar" && (
         <div className="card pop-in space-y-4 p-4">
           <MovimientoFields categorias={categorias} value={estado.campos} onChange={(campos) => setEstado({ ...estado, campos })} />
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             <button className="btn-ghost" disabled={pending} onClick={() => { setEstado({ k: "idle" }); setAviso(null); }}>Cancelar</button>
             <button className="btn-primary" disabled={pending}
               onClick={() => guardar(estado.campos, estado.source, estado.confidence, estado.sugerido)}>
@@ -160,7 +160,7 @@ export function RegistroRapido({ prefs, categorias }: { prefs: Preferencia[]; ca
       )}
 
       {estado.k === "idle" && (
-        <button className="w-full text-center text-xs font-medium text-muted underline-offset-4 hover:underline"
+        <button className="tap w-full text-muted underline-offset-4 hover:underline"
           onClick={() => { setAviso(null); setEstado({ k: "editar", campos: vacio(), source: "manual", confidence: null }); }}>
           Registro manual
         </button>

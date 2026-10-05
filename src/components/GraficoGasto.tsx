@@ -73,12 +73,12 @@ export function GraficoGasto({ datos, punto }: { datos: Punto[]; punto: "dia" | 
             className="pointer-events-none absolute -top-2 z-10 -translate-x-1/2 -translate-y-full rounded-lg border border-line bg-surface px-2.5 py-1.5 text-center shadow-md"
             style={{ left: `${Math.min(Math.max(((activo + 0.5) / n) * 100, 12), 88)}%` }}>
             <p className="text-sm font-semibold tabular-nums">{soles(a.total)}</p>
-            <p className="text-[11px] text-muted">{a.detalle}</p>
+            <p className="text-xs text-muted">{a.detalle}</p>
           </div>
         )}
       </div>
       <details className="mt-2">
-        <summary className="cursor-pointer text-xs text-muted hover:text-fg">Ver como tabla</summary>
+        <summary className="tap -ml-3 cursor-pointer text-muted hover:text-fg">Ver como tabla</summary>
         <table className="mt-2 w-full text-sm">
           <thead><tr className="text-left text-xs text-muted"><th className="py-1 font-medium">{punto === "dia" ? "Día" : "Mes"}</th><th className="py-1 text-right font-medium">Gasto</th></tr></thead>
           <tbody>

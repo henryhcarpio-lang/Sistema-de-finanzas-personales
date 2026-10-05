@@ -48,7 +48,7 @@ export default async function MovimientosPage({ searchParams }: PageProps<"/movi
           </select>
         </div>
         <details open={avanzados} className="group">
-          <summary className="cursor-pointer list-none py-1 text-xs font-medium text-muted hover:text-fg">
+          <summary className="tap -ml-3 cursor-pointer list-none text-muted hover:text-fg">
             <span className="group-open:hidden">+ Más filtros</span><span className="hidden group-open:inline">− Menos filtros</span>
           </summary>
           <div className="mt-2 grid grid-cols-2 gap-2">
@@ -72,7 +72,7 @@ export default async function MovimientosPage({ searchParams }: PageProps<"/movi
         <div className="flex flex-wrap items-center gap-1.5" aria-label="Filtros activos">
           {chips.map((c) => (
             <Link key={c.clave} href={`/movimientos?${aQuery(f, { [c.clave]: null })}`} aria-label={`Quitar filtro ${c.texto}`}
-              className="inline-flex min-h-8 items-center gap-1 rounded-full bg-brand/10 px-3 text-xs font-medium text-brand">
+              className="inline-flex min-h-11 items-center gap-1 rounded-full bg-brand/10 px-3 text-xs font-medium text-brand">
               {c.texto} <span aria-hidden>×</span>
             </Link>
           ))}
@@ -94,7 +94,7 @@ export default async function MovimientosPage({ searchParams }: PageProps<"/movi
         {AGRUPAR.map((a) => (
           <Link key={a.v} href={`/movimientos?${aQuery(f, { agrupar: a.v === "dia" ? null : a.v })}`}
             aria-current={f.agrupar === a.v ? "true" : undefined}
-            className={`flex min-h-9 items-center justify-center rounded-lg text-xs font-semibold transition ${f.agrupar === a.v ? "bg-fg text-bg" : "text-muted"}`}>
+            className={`flex min-h-11 items-center justify-center rounded-lg text-xs font-semibold transition ${f.agrupar === a.v ? "bg-fg text-bg" : "text-muted"}`}>
             {a.l}
           </Link>
         ))}

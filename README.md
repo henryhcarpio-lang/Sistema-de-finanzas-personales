@@ -4,7 +4,7 @@ App web mobile-first para registrar movimientos en ~5 segundos: **hablar o escri
 
 Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + Postgres con RLS) · Vercel.
 
-## Estado: Fases 1 a 7 completadas
+## Estado: Fases 1 a 8 completadas
 
 - Registro por texto en lenguaje natural ("un sol pasaje", "me depositaron 2,500 soles") con tarjeta **Confirmar | Editar**.
 - Clasificación inicial por reglas (tipo, categoría, naturaleza, etiquetas, confianza). Las frases ambiguas ("Banco 500") piden el tipo.
@@ -16,6 +16,8 @@ Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + 
 - **Fase 5:** dashboard avanzado: gráfico de gasto por día (por mes en el periodo Año) con tooltip, foco con teclado y vista de tabla; reparto necesidades / deseos / deudas; proyección del gasto al cierre del mes; variación por categoría y total frente al periodo anterior.
 - **Fase 6:** presupuestos mensuales por categoría (sobres): gastado, disponible, % usado y proyección; estados *en orden*, *en riesgo* (la proyección supera el límite), *cerca del límite* (≥ 80 %) y *excedido*, siempre con icono y texto. Al registrar un gasto con presupuesto, la app dice cuánto queda. Nunca bloquea un gasto.
 - **Fase 7:** deudas y pagos recurrentes (pestaña *Pagos*). Cuotas mensuales, semanales o anuales calculadas a partir de cada compromiso; vencidas, de hoy y próximas; botón **Pagar** que crea el movimiento real vinculado a la cuota (una cuota futura nunca cuenta como gasto, y no se puede pagar dos veces). Deudas con saldo, cuotas pagadas/total, acreedor y tasa. El dashboard muestra los próximos compromisos de 7 días.
+- **Fase 8: inteligencia financiera** (sección *Tu resumen inteligente* del Resumen): resumen del mes en palabras, gastos atípicos frente a lo habitual de su categoría, categorías que suben comparadas a la misma fecha de meses anteriores, aumento de gastos en deseos y presupuestos sugeridos con botón "Usar S/ X". Con menos de 3 semanas de datos no da recomendaciones. Solo sugiere: nada se crea sin que el usuario lo toque (`src/lib/inteligencia.ts`).
+- **Diseño táctil:** todo lo tocable mide al menos 44 px, textos de 13–16 px, campos a 16 px (sin zoom de iOS), sin zoom por doble toque; barra inferior de 5 zonas anchas en celular y barra lateral con Resumen a dos columnas en computadora.
 - **Ver un día específico:** periodos *Ayer* y *Día* (con navegación ‹ › día a día y selector de fecha) en Movimientos y Dashboard; los demás filtros se conservan al cambiar de día.
 - **Fechas en la frase:** "ayer 18 soles taxi", "anteayer…", "hace 3 días…", "el lunes…", "el 3 de octubre…", "el día 10…". La tarjeta muestra la fecha detectada.
 - **Instalable:** manifiesto e iconos para "Agregar a la pantalla de inicio" (Android e iPhone).

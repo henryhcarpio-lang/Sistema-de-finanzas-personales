@@ -1,24 +1,45 @@
 import Link from "next/link";
-import { BottomNav } from "@/components/BottomNav";
+import { BottomNav, SideNav } from "@/components/BottomNav";
 import { cerrarSesion } from "../login/actions";
+
+function Logo() {
+  return (
+    <span className="text-lg font-bold tracking-tight">
+      <span className="text-brand">●</span> Finanzas
+    </span>
+  );
+}
 
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
-    <div className="mx-auto min-h-dvh max-w-xl px-4 pb-28 pt-4 md:max-w-3xl md:pb-10">
-      <header className="mb-4 flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold tracking-tight">
-          <span className="text-brand">●</span> Finanzas
-        </span>
-        <div className="hidden md:block"><BottomNav /></div>
-        <div className="flex items-center gap-4">
-          <Link href="/categorias" className="text-xs text-muted hover:text-fg">Categorías</Link>
+    <div className="min-h-dvh">
+      {/* Computadora: barra lateral fija */}
+      <aside className="fixed inset-y-0 left-0 z-20 hidden w-64 flex-col border-r border-line bg-surface px-4 py-6 lg:flex">
+        <div className="mb-8 px-3"><Logo /></div>
+        <SideNav />
+        <div className="mt-auto space-y-1 border-t border-line pt-4">
+          <Link href="/categorias" className="flex min-h-11 items-center rounded-xl px-3 text-base text-muted hover:bg-bg hover:text-fg">Categorías</Link>
           <form action={cerrarSesion}>
-            <button className="text-xs text-muted hover:text-fg">Salir</button>
+            <button className="flex min-h-11 w-full items-center rounded-xl px-3 text-base text-muted hover:bg-bg hover:text-fg">Salir</button>
           </form>
         </div>
-      </header>
-      <main>{children}</main>
-      <div className="md:hidden"><BottomNav /></div>
+      </aside>
+
+      <div className="mx-auto w-full max-w-xl px-4 pb-32 pt-3 sm:max-w-2xl lg:ml-64 lg:max-w-none lg:px-10 lg:pb-12 lg:pt-8">
+        <div className="lg:mx-auto lg:max-w-5xl">
+          {/* Celular y tablet: cabecera compacta */}
+          <header className="mb-3 flex items-center justify-between lg:hidden">
+            <Logo />
+            <div className="-mr-3 flex items-center">
+              <Link href="/categorias" className="tap text-muted">Categorías</Link>
+              <form action={cerrarSesion}><button className="tap text-muted">Salir</button></form>
+            </div>
+          </header>
+          <main>{children}</main>
+        </div>
+      </div>
+
+      <div className="lg:hidden"><BottomNav /></div>
     </div>
   );
 }

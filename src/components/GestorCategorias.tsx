@@ -53,7 +53,7 @@ export function GestorCategorias({ categorias }: { categorias: Categoria[] }) {
                 <button className="btn bg-neg text-white" disabled={pending} onClick={() => eliminar(c.id)}>Eliminar</button>
               </div>
             ) : (
-              <button className="text-xs font-medium text-neg" aria-label={`Eliminar ${c.name}`} onClick={() => setBorrando(c.id)}>
+              <button className="tap -mr-3 text-neg" aria-label={`Eliminar ${c.name}`} onClick={() => setBorrando(c.id)}>
                 Eliminar
               </button>
             )}

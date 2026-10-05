@@ -24,10 +24,10 @@ export function PeriodoSelector({ base, actual, extra = {}, from, to }: {
   return (
     <div className="space-y-2">
       <nav aria-label="Periodo" className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        <div className="flex w-max gap-1 rounded-xl bg-surface p-1 ring-1 ring-line">
+        <div className="flex w-max gap-1.5 rounded-xl bg-surface p-1 ring-1 ring-line">
           {PERIODOS.map((o) => (
             <Link key={o.v} href={o.v === "dia" ? href("dia", dia) : href(o.v)} aria-current={actual === o.v ? "true" : undefined}
-              className={`flex min-h-10 items-center justify-center whitespace-nowrap rounded-lg px-3 text-xs font-semibold transition ${actual === o.v ? "bg-brand text-brand-fg" : "text-muted hover:text-fg"}`}>
+              className={`flex min-h-11 items-center justify-center whitespace-nowrap rounded-lg px-4 text-sm font-semibold transition ${actual === o.v ? "bg-brand text-brand-fg" : "text-muted hover:text-fg"}`}>
               {o.l}
             </Link>
           ))}
@@ -37,7 +37,7 @@ export function PeriodoSelector({ base, actual, extra = {}, from, to }: {
       {esUnDia(actual) && (
         <div className="flex items-center gap-2" data-testid="navegador-dia">
           <Link href={hrefDia(addDays(dia, -1))} aria-label="Día anterior"
-            className="btn-ghost min-h-10 w-11 shrink-0 px-0 text-lg">‹</Link>
+            className="btn-ghost w-12 shrink-0 px-0 text-2xl">‹</Link>
           <form action={base} className="flex flex-1 items-center gap-2">
             {conservar.map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
             <input type="hidden" name="p" value="dia" />
@@ -46,12 +46,12 @@ export function PeriodoSelector({ base, actual, extra = {}, from, to }: {
               <input type="date" name="d" defaultValue={dia} max={hoy} aria-label="Elegir día"
                 className="field text-center font-semibold" />
             </label>
-            <button className="btn-ghost min-h-10 px-3 text-xs">Ver</button>
+            <button className="btn-ghost px-4">Ver</button>
           </form>
           {dia < hoy ? (
-            <Link href={hrefDia(addDays(dia, 1))} aria-label="Día siguiente" className="btn-ghost min-h-10 w-11 shrink-0 px-0 text-lg">›</Link>
+            <Link href={hrefDia(addDays(dia, 1))} aria-label="Día siguiente" className="btn-ghost w-12 shrink-0 px-0 text-2xl">›</Link>
           ) : (
-            <span aria-disabled="true" aria-label="Día siguiente" className="btn-ghost min-h-10 w-11 shrink-0 cursor-not-allowed px-0 text-lg opacity-40">›</span>
+            <span aria-disabled="true" aria-label="Día siguiente" className="btn-ghost w-12 shrink-0 cursor-not-allowed px-0 text-2xl opacity-40">›</span>
           )}
         </div>
       )}

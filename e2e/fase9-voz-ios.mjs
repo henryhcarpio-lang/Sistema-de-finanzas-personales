@@ -1,6 +1,6 @@
 // Reconocimiento de voz al estilo Safari (iPhone): modo continuo sin fin propio,
 // pausas entre tramos, resultados acumulativos, varias alternativas y arranques fallidos.
-import { B, K, U, entrar, lanzar, ok, reiniciar, token } from "./comun.mjs";
+import { K, U, entrar, lanzar, ok, reiniciar, token } from "./comun.mjs";
 await reiniciar();
 
 const fake = () => {
