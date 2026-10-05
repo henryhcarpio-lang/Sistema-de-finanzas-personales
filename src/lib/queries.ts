@@ -146,7 +146,7 @@ export async function listarCompromisos(): Promise<Compromiso[]> {
   const { supabase } = await requireUser();
   const { data, error } = await supabase
     .from("fin_recurrents")
-    .select("id,kind,name,creditor,category,amount,frequency,day_of_month,start_date,end_date,installments_total,initial_amount,interest_rate")
+    .select("id,kind,name,creditor,category,amount,frequency,day_of_month,start_date,end_date,installments_total,initial_amount,interest_rate,installments_paid_before")
     .eq("active", true)
     .order("name");
   if (error) throw new Error("No se pudieron cargar los compromisos");
@@ -162,7 +162,8 @@ export async function listarCompromisos(): Promise<Compromiso[]> {
 export async function listarPagos(): Promise<Pago[]> {
   const { supabase } = await requireUser();
   const { data } = await supabase
-    .from("fin_transactions").select("recurrent_id,due_date,amount")
+    .from("fin_transactions").select("id,recurrent_id,due_date,amount,occurred_on")
+    .order("occurred_on", { ascending: false })
     .not("recurrent_id", "is", null).limit(5000);
   return (data ?? []).map((p) => ({ ...p, amount: Number(p.amount) })) as Pago[];
 }

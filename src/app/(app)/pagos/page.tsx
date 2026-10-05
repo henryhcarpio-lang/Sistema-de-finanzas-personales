@@ -1,5 +1,6 @@
 import { CuotaFila } from "@/components/CuotaFila";
-import { EliminarCompromiso } from "@/components/EliminarCompromiso";
+import { AccionesCompromiso } from "@/components/EditarCompromiso";
+import { PagosRegistrados } from "@/components/PagosRegistrados";
 import { FormCompromiso } from "@/components/FormCompromiso";
 import { calendario, fraseFrecuencia, proximaCuota, resumenDeuda } from "@/lib/compromisos";
 import { etiquetaFecha, soles, todayLima } from "@/lib/dates";
@@ -13,6 +14,8 @@ export default async function PagosPage() {
   const totalPendiente = cuotas.reduce((s, c) => s + c.compromiso.amount, 0);
   const deudas = compromisos.filter((c) => c.kind === "deuda");
   const recurrentes = compromisos.filter((c) => c.kind === "recurrente");
+  const nombresCat = categorias.map((c) => c.name);
+  const pagosDe = (id: string) => pagos.filter((p) => p.recurrent_id === id);
 
   return (
     <div className="space-y-5">
@@ -21,7 +24,7 @@ export default async function PagosPage() {
         <p className="mt-1 text-sm text-muted">Una cuota solo se vuelve gasto cuando la pagas.</p>
       </div>
 
-      <FormCompromiso categorias={categorias.map((c) => c.name)} />
+      <FormCompromiso categorias={nombresCat} />
 
       {compromisos.length === 0 ? (
         <div className="card p-6 text-center text-sm text-muted">
@@ -75,7 +78,8 @@ export default async function PagosPage() {
                       {[d.creditor, d.interest_rate !== null ? `${d.interest_rate} % anual` : null,
                         prox ? `próxima: ${etiquetaFecha(prox.fecha, hoy)}` : "sin cuotas pendientes"].filter(Boolean).join(" · ")}
                     </p>
-                    <div className="text-right"><EliminarCompromiso id={d.id} nombre={d.name} /></div>
+                    <PagosRegistrados compromiso={d} pagos={pagosDe(d.id)} />
+                    <AccionesCompromiso compromiso={d} categorias={nombresCat} pagosApp={pagosDe(d.id).length} />
                   </article>
                 );
               })}
@@ -94,10 +98,9 @@ export default async function PagosPage() {
                         <span className="truncate text-sm font-medium">{c.name}</span>
                         <span className="shrink-0 text-sm tabular-nums">{soles(c.amount)} <span className="text-muted">{fraseFrecuencia(c)}</span></span>
                       </div>
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs text-muted">{c.category}{prox ? ` · próximo: ${etiquetaFecha(prox.fecha, hoy)}` : ""}</span>
-                        <EliminarCompromiso id={c.id} nombre={c.name} />
-                      </div>
+                      <p className="text-xs text-muted">{c.category}{prox ? ` · próximo: ${etiquetaFecha(prox.fecha, hoy)}` : ""}</p>
+                      <PagosRegistrados compromiso={c} pagos={pagosDe(c.id)} />
+                      <AccionesCompromiso compromiso={c} categorias={nombresCat} pagosApp={pagosDe(c.id).length} />
                     </li>
                   );
                 })}

@@ -17,6 +17,7 @@ Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + 
 - **Fase 6:** presupuestos mensuales por categoría (sobres): gastado, disponible, % usado y proyección; estados *en orden*, *en riesgo* (la proyección supera el límite), *cerca del límite* (≥ 80 %) y *excedido*, siempre con icono y texto. Al registrar un gasto con presupuesto, la app dice cuánto queda. Nunca bloquea un gasto.
 - **Fase 7:** deudas y pagos recurrentes (pestaña *Pagos*). Cuotas mensuales, semanales o anuales calculadas a partir de cada compromiso; vencidas, de hoy y próximas; botón **Pagar** que crea el movimiento real vinculado a la cuota (una cuota futura nunca cuenta como gasto, y no se puede pagar dos veces). Deudas con saldo, cuotas pagadas/total, acreedor y tasa. El dashboard muestra los próximos compromisos de 7 días.
 - **Fase 8: inteligencia financiera** (sección *Tu resumen inteligente* del Resumen): resumen del mes en palabras, gastos atípicos frente a lo habitual de su categoría, categorías que suben comparadas a la misma fecha de meses anteriores, aumento de gastos en deseos y presupuestos sugeridos con botón "Usar S/ X". Con menos de 3 semanas de datos no da recomendaciones. Solo sugiere: nada se crea sin que el usuario lo toque (`src/lib/inteligencia.ts`).
+- **Editar deudas y pagos:** cada deuda y pago recurrente tiene **Editar** (nombre, cuota, día, nº de cuotas, saldo, acreedor, tasa). Campo **"Voy en la cuota Nº"**: si un préstamo de 12 cuotas ya va en la 8, la app empieza en la 8/12 y cuenta 7 pagadas sin crear gastos falsos. Cada pago hecho aparece en *Pagos registrados* con su número de cuota y se puede editar o eliminar.
 - **Diseño táctil:** todo lo tocable mide al menos 44 px, textos de 13–16 px, campos a 16 px (sin zoom de iOS), sin zoom por doble toque; barra inferior de 5 zonas anchas en celular y barra lateral con Resumen a dos columnas en computadora.
 - **Ver un día específico:** periodos *Ayer* y *Día* (con navegación ‹ › día a día y selector de fecha) en Movimientos y Dashboard; los demás filtros se conservan al cambiar de día.
 - **Fechas en la frase:** "ayer 18 soles taxi", "anteayer…", "hace 3 días…", "el lunes…", "el 3 de octubre…", "el día 10…". La tarjeta muestra la fecha detectada.
@@ -44,7 +45,7 @@ Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + 
 
 ## Configuración
 
-Proyecto Supabase: `finanzas-personales` (ref `gjcwiwmqgqlhuquyieia`, región sa-east-1). Las migraciones de `supabase/migrations/` (0001 a 0004) ya están aplicadas.
+Proyecto Supabase: `finanzas-personales` (ref `gjcwiwmqgqlhuquyieia`, región sa-east-1). Las migraciones de `supabase/migrations/` (0001 a 0005) ya están aplicadas.
 
 1. Copia `.env.example` a `.env.local`; ya incluye la URL y la clave publicable del proyecto:
 
@@ -89,5 +90,5 @@ Necesitan una cuenta de prueba confirmada en Supabase y `.env.local`. Opcional: 
 - La app es instalable pero aún no funciona sin conexión (no hay service worker).
 - Voz: si en el futuro se necesita soporte en Firefox o más precisión, se puede cambiar a transcripción en el servidor (p. ej. Whisper); el componente solo entrega texto a `parseMovimiento`.
 - Cuentas (efectivo, banco, tarjeta) solo existen como campo; su gestión llega más adelante.
-- Compromisos: aún no se editan (se eliminan y se crean de nuevo). El monto pagado es siempre la cuota; un pago parcial se registra editando el movimiento creado. No hay recordatorios por notificación.
+- Compromisos: el monto pagado es siempre la cuota; un pago parcial se registra editando el movimiento creado. No hay recordatorios por notificación.
 - El dashboard agrega en el servidor sobre las filas del periodo; si el volumen crece, conviene moverlo a vistas o RPC en SQL.

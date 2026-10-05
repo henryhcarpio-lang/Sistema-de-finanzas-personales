@@ -70,3 +70,16 @@ describe("resumenDeuda y próxima cuota", () => {
     expect(proximaCuota(base({ start_date: "2026-09-01" }), [{ recurrent_id: "c1", due_date: "2026-09-15", amount: 620 }], T)).toMatchObject({ fecha: "2026-10-15", estado: "proxima" });
   });
 });
+
+describe("cuotas pagadas antes de usar la app", () => {
+  const p = base({ installments_total: 12, installments_paid_before: 7, start_date: "2026-10-01", amount: 100, initial_amount: 1200 });
+  it("numera desde la cuota 8 y termina en la 12", () => {
+    const o = ocurrencias(p, "2026-01-01", "2027-12-31");
+    expect(o.map((x) => x.numero)).toEqual([8, 9, 10, 11, 12]);
+    expect(o[0].fecha).toBe("2026-10-15");
+  });
+  it("el resumen cuenta las previas sin crear gastos", () => {
+    expect(resumenDeuda(p, [{ recurrent_id: "c1", due_date: "2026-10-15", amount: 100 }]))
+      .toEqual({ pagado: 800, saldo: 400, cuotasPagadas: 8, cuotasTotal: 12, progreso: 800 / 1200 });
+  });
+});

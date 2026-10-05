@@ -17,6 +17,8 @@ export interface Compromiso {
   installments_total: number | null;
   initial_amount: number | null;
   interest_rate: number | null;
+  /** Cuotas pagadas antes de registrarlo en la app: no son movimientos. */
+  installments_paid_before?: number;
 }
 
 /** Pago real ya registrado: un movimiento vinculado a una cuota. */
@@ -24,6 +26,8 @@ export interface Pago {
   recurrent_id: string;
   due_date: string;
   amount: number;
+  id?: string;
+  occurred_on?: string;
 }
 
 export type EstadoCuota = "vencida" | "hoy" | "proxima" | "pagada";
@@ -31,13 +35,15 @@ export type EstadoCuota = "vencida" | "hoy" | "proxima" | "pagada";
 export interface Cuota {
   compromiso: Compromiso;
   fecha: string;
-  numero: number; // 1 = primera cuota desde start_date
+  numero: number; // número real de cuota (incluye las pagadas antes)
   estado: EstadoCuota;
 }
 
 const ultimoDia = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate();
 const iso = (y: number, m: number, d: number) =>
   `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+
+const previas = (c: Compromiso) => c.installments_paid_before ?? 0;
 
 /** Fecha de la cuota n (1, 2, …) o null si no existe. */
 function fechaCuota(c: Compromiso, n: number): string | null {
@@ -57,7 +63,7 @@ function fechaCuota(c: Compromiso, n: number): string | null {
     const m = (total % 12) + 1;
     f = iso(y, m, Math.min(dia, ultimoDia(y, m)));
   }
-  if (c.installments_total && n > c.installments_total) return null;
+  if (c.installments_total && previas(c) + n > c.installments_total) return null;
   if (c.end_date && f > c.end_date) return null;
   return f;
 }
@@ -68,7 +74,7 @@ export function ocurrencias(c: Compromiso, desde: string, hasta: string): { fech
   for (let n = 1; n < 5000; n++) {
     const f = fechaCuota(c, n);
     if (!f || f > hasta) break;
-    if (f >= desde) out.push({ fecha: f, numero: n });
+    if (f >= desde) out.push({ fecha: f, numero: previas(c) + n });
   }
   return out;
 }
@@ -110,13 +116,15 @@ export interface ResumenDeuda {
 
 export function resumenDeuda(c: Compromiso, pagos: Pago[]): ResumenDeuda {
   const propios = pagos.filter((p) => p.recurrent_id === c.id);
-  const pagado = Math.round(propios.reduce((s, p) => s + p.amount, 0) * 100) / 100;
+  const antes = previas(c);
+  const pagado = Math.round((antes * c.amount + propios.reduce((s, p) => s + p.amount, 0)) * 100) / 100;
+  const cuotasPagadas = antes + propios.length;
   const saldo = c.initial_amount ? Math.max(Math.round((c.initial_amount - pagado) * 100) / 100, 0) : null;
   const progreso =
     c.initial_amount ? Math.min(pagado / c.initial_amount, 1)
-    : c.installments_total ? Math.min(propios.length / c.installments_total, 1)
+    : c.installments_total ? Math.min(cuotasPagadas / c.installments_total, 1)
     : null;
-  return { pagado, saldo, cuotasPagadas: propios.length, cuotasTotal: c.installments_total, progreso };
+  return { pagado, saldo, cuotasPagadas, cuotasTotal: c.installments_total, progreso };
 }
 
 const FRASE_FRECUENCIA: Record<Frecuencia, string> = { semanal: "cada semana", mensual: "al mes", anual: "al año" };

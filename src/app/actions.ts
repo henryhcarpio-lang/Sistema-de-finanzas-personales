@@ -207,9 +207,12 @@ const CompromisoInput = z.object({
   installments_total: z.number().int().positive().max(1200).nullable(),
   initial_amount: z.number().positive().max(1e10).nullable(),
   interest_rate: z.number().min(0).max(1000).nullable(),
-}).refine((c) => c.frequency !== "mensual" || c.day_of_month !== null, { message: "Indica el día de pago" });
+  installments_paid_before: z.number().int().min(0).max(1200).default(0),
+}).refine((c) => c.frequency !== "mensual" || c.day_of_month !== null, { message: "Indica el día de pago" })
+  .refine((c) => !c.installments_total || c.installments_paid_before < c.installments_total,
+    { message: "La cuota actual no puede pasar del total de cuotas" });
 
-export async function crearCompromiso(input: z.infer<typeof CompromisoInput>): Promise<ActionResult> {
+export async function crearCompromiso(input: z.input<typeof CompromisoInput>): Promise<ActionResult> {
   const parsed = CompromisoInput.safeParse(input);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
@@ -219,6 +222,22 @@ export async function crearCompromiso(input: z.infer<typeof CompromisoInput>): P
     if (error) return { ok: false, error: "No se pudo guardar" };
     revalidar();
     return { ok: true, id: data.id };
+  } catch {
+    return { ok: false, error: "Sesión expirada" };
+  }
+}
+
+/** Edita un compromiso. Los pagos ya hechos siguen como movimientos. */
+export async function actualizarCompromiso(id: string, input: z.input<typeof CompromisoInput>): Promise<ActionResult> {
+  if (!z.uuid().safeParse(id).success) return { ok: false, error: "Id inválido" };
+  const parsed = CompromisoInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  try {
+    const { supabase } = await requireUser();
+    const { error } = await supabase.from("fin_recurrents").update(parsed.data).eq("id", id);
+    if (error) return { ok: false, error: "No se pudo guardar" };
+    revalidar();
+    return { ok: true, id };
   } catch {
     return { ok: false, error: "Sesión expirada" };
   }
