@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
-import { useVozRegistro } from "@/hooks/useVozRegistro";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { recargaTrasDictar, useVozRegistro } from "@/hooks/useVozRegistro";
 import { crearMovimiento } from "@/app/actions";
 import { parseMovimiento } from "@/lib/parser";
+import { separarMovimientos } from "@/lib/separar";
 import { elegirCandidata } from "@/lib/transcripcion";
 import { etiquetaFecha, soles, todayLima } from "@/lib/dates";
 import type { Categoria, Draft, Fuente, Preferencia } from "@/lib/types";
@@ -12,6 +13,7 @@ import { MovimientoFields, camposAInput, type Campos } from "./MovimientoFields"
 type Estado =
   | { k: "idle" }
   | { k: "confirmar"; draft: Draft; source: Fuente }
+  | { k: "varios"; drafts: Draft[]; source: Fuente }
   | { k: "editar"; campos: Campos; source: Fuente; confidence: number | null; sugerido?: Campos };
 
 const vacio = (): Campos => ({
@@ -36,7 +38,16 @@ export function RegistroRapido({ prefs, categorias, voz: vozAjustes = { activa: 
   /** Texto escrito o dictado → tarjeta de confirmación (o pedir el tipo si es ambiguo). */
   function interpretar(frase: string, source: Fuente) {
     setAviso(null);
-    const draft = parseMovimiento(frase, todayLima(), prefs);
+    // Varios movimientos en una frase: "un sol taxi, dos soles pasaje".
+    const hoy = todayLima();
+    const sep = separarMovimientos(frase, hoy);
+    if (sep.frases.length > 1) {
+      const drafts = sep.frases.map((f) => parseMovimiento(f, hoy, prefs)).filter((d): d is Draft => !!d)
+        .map((d) => (sep.fecha && d.occurred_on === hoy ? { ...d, occurred_on: sep.fecha } : d))
+        .map((d) => (d.needsType ? { ...d, type: "egreso" as const, needsType: false, confidence: 0.2 } : d));
+      if (drafts.length > 1) { setEstado({ k: "varios", drafts, source }); return; }
+    }
+    const draft = parseMovimiento(frase, hoy, prefs);
     if (!draft) {
       if (source === "voz") {
         // Se deja lo entendido en el campo para corregirlo a mano.
@@ -71,19 +82,67 @@ export function RegistroRapido({ prefs, categorias, voz: vozAjustes = { activa: 
       if (!res.ok) return setAviso({ ok: false, msg: res.error });
       const hoy = todayLima();
       const cuando = r.input.occurred_on === hoy ? "" : ` · ${etiquetaFecha(r.input.occurred_on, hoy)}`;
-      setAviso({ ok: true, msg: `Registrado: ${r.input.concept} · ${soles(r.input.amount)}${cuando}`, extra: res.presupuesto });
+      const msg = `Registrado: ${r.input.concept} · ${soles(r.input.amount)}${cuando}`;
+      if (!res.presupuesto && recargarSiHaceFalta(source, msg)) return;
+      setAviso({ ok: true, msg, extra: res.presupuesto });
       setEstado({ k: "idle" });
       setTexto("");
       // Tras un dictado no se enfoca el campo: en iPhone abriría el teclado y su dictado,
       // que compiten por el micrófono con el siguiente registro por voz.
       if (source !== "voz") inputRef.current?.focus();
+      porTeclado.current = false;
     });
   }
+
+  /** Tras un registro por voz en un iPhone afectado, recarga para que el próximo dictado sea "el primero". */
+  const recargarSiHaceFalta = (source: Fuente, msg: string) => {
+    if (source !== "voz" || porTeclado.current || !recargaTrasDictar()) return false;
+    try { sessionStorage.setItem("aviso-registro", msg); } catch { return false; }
+    window.location.reload();
+    return true;
+  };
+  useEffect(() => {
+    try {
+      const msg = sessionStorage.getItem("aviso-registro");
+      if (msg) { sessionStorage.removeItem("aviso-registro"); setTimeout(() => setAviso({ ok: true, msg }), 0); }
+    } catch { /* sin almacenamiento */ }
+  }, []);
+
+  function guardarVarios(drafts: Draft[], source: Fuente) {
+    start(async () => {
+      let ok = 0;
+      for (const d of drafts) {
+        const r = camposAInput(draftACampos(d));
+        if ("error" in r) continue;
+        const res = await crearMovimiento({ ...r.input, account: cuenta, source, confidence: d.confidence });
+        if (res.ok) ok++;
+      }
+      const total = drafts.reduce((s2, d) => s2 + d.amount, 0);
+      const msg = ok === drafts.length ? `Registrados ${ok} movimientos · ${soles(total)}` : `Se registraron ${ok} de ${drafts.length}. Revisa el historial.`;
+      if (ok === drafts.length && recargarSiHaceFalta(source, msg)) return;
+      setAviso({ ok: ok === drafts.length, msg });
+      setEstado({ k: "idle" });
+      setTexto("");
+      porTeclado.current = false;
+    });
+  }
+
+  // Dictado con el micrófono del teclado: al dejar de llegar texto, se interpreta solo.
+  const porTeclado = useRef(false);
+  const tTeclado = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const alEscribir = (v: string) => {
+    setTexto(v);
+    if (!porTeclado.current) return;
+    if (tTeclado.current) clearTimeout(tTeclado.current);
+    tTeclado.current = setTimeout(() => {
+      if (v.trim() && parseMovimiento(v, todayLima(), prefs)) interpretar(v, "voz");
+    }, 1800);
+  };
 
   return (
     <section className="space-y-3">
       {conVoz && (
-        <Microfono voz={voz} ocupado={pending} onTeclado={() => { voz.cerrarError(); inputRef.current?.focus(); }} onIniciar={() => { setAviso(null); setEstado({ k: "idle" }); voz.iniciar(); }} />
+        <Microfono voz={voz} ocupado={pending} onTeclado={() => { voz.cerrarError(); porTeclado.current = true; setAviso({ ok: true, msg: "Toca 🎤 en el teclado y dicta. Se interpreta solo al terminar." }); inputRef.current?.focus(); }} onIniciar={() => { setAviso(null); setEstado({ k: "idle" }); voz.iniciar(); }} />
       )}
 
       <form onSubmit={(e) => { e.preventDefault(); interpretar(texto, "texto"); }} className="card flex items-center gap-2 p-2">
@@ -91,7 +150,7 @@ export function RegistroRapido({ prefs, categorias, voz: vozAjustes = { activa: 
           ref={inputRef}
           autoFocus
           value={texto}
-          onChange={(e) => setTexto(e.target.value)}
+          onChange={(e) => alEscribir(e.target.value)}
           placeholder={conVoz ? "O escribe: 18 soles taxi" : "Ej.: 18 soles taxi"}
           aria-label="Describe tu movimiento"
           enterKeyHint="go"
@@ -109,6 +168,39 @@ export function RegistroRapido({ prefs, categorias, voz: vozAjustes = { activa: 
             </span>
           )}
         </p>
+      )}
+
+      {estado.k === "varios" && (
+        <div className="card pop-in space-y-3 p-4" aria-label="Varios movimientos">
+          <p className="text-sm font-semibold">Entendí {estado.drafts.length} movimientos</p>
+          <ul className="divide-y divide-line">
+            {estado.drafts.map((d, i) => (
+              <li key={i} className="flex items-center gap-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-base font-semibold">{d.concept}</p>
+                  <p className="truncate text-xs text-muted">
+                    {d.category}{d.nature ? ` · ${d.nature}` : ""}
+                    {d.occurred_on !== todayLima() ? ` · ${etiquetaFecha(d.occurred_on, todayLima())}` : ""}
+                    {d.confidence < 0.7 && <span className="text-neg"> · revisa</span>}
+                  </p>
+                </div>
+                <span className="shrink-0 text-lg font-bold tabular-nums">{soles(d.amount)}</span>
+                <button type="button" className="tap px-2 text-sm text-muted" aria-label={`Quitar ${d.concept}`}
+                  onClick={() => {
+                    const resto = estado.drafts.filter((_, j) => j !== i);
+                    setEstado(resto.length === 1 ? { k: "confirmar", draft: resto[0], source: estado.source } : { ...estado, drafts: resto });
+                  }}>Quitar</button>
+              </li>
+            ))}
+          </ul>
+          <p className="text-right text-sm text-muted tabular-nums">Total {soles(estado.drafts.reduce((a, d) => a + d.amount, 0))}</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button className="btn-ghost" onClick={() => setEstado({ k: "idle" })}>Cancelar</button>
+            <button className="btn-primary" disabled={pending} onClick={() => guardarVarios(estado.drafts, estado.source)}>
+              {pending ? "Guardando…" : `Confirmar ${estado.drafts.length}`}
+            </button>
+          </div>
+        </div>
       )}
 
       {estado.k === "confirmar" && (

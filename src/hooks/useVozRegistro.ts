@@ -81,6 +81,15 @@ function modoGuardado(): Modo {
   try { const m = localStorage.getItem("voz-modo"); if (m === "continuo" || m === "simple") return m; } catch { /* sin almacenamiento */ }
   return esIOS() ? "simple" : "continuo";
 }
+/**
+ * En algunos iPhone solo el primer dictado de cada carga de página devuelve
+ * texto. Si se detecta (falla un dictado que no fue el primero), se activa
+ * "recargar tras dictar": la página se recarga sola después de cada registro
+ * por voz, así cada dictado vuelve a ser el primero.
+ */
+export const recargaTrasDictar = () => { try { return localStorage.getItem("voz-recargar") === "1"; } catch { return false; } };
+function marcarRecarga(v: boolean) { try { localStorage.setItem("voz-recargar", v ? "1" : "0"); } catch { /* sin almacenamiento */ } }
+
 function guardarModo(m: Modo) { try { localStorage.setItem("voz-modo", m); } catch { /* sin almacenamiento */ } }
 const MSG_SIN_TEXTO = "El micrófono se abrió pero no llegó texto. Toca «Reintentar» (probaré otro modo). Si sigue igual, revisa que el Dictado esté activado en Ajustes › General › Teclado.";
 
@@ -172,7 +181,11 @@ export function useVozRegistro(onTexto: (candidatas: string[]) => void, idioma =
         }
         // Micrófono abierto pero sin texto: el siguiente intento usa el otro modo.
         const sinTexto = hayAudio && (errorFatal === null || errorFatal === "no-speech");
-        if (sinTexto) { guardarModo(modo === "continuo" ? "simple" : "continuo"); log(`sin texto: próximo modo ${modo === "continuo" ? "simple" : "continuo"}`); }
+        if (sinTexto) {
+          guardarModo(modo === "continuo" ? "simple" : "continuo");
+          log(`sin texto: próximo modo ${modo === "continuo" ? "simple" : "continuo"}`);
+          if (!nuevo) { marcarRecarga(true); log("falló un dictado posterior al primero: se recargará tras cada dictado"); }
+        }
         const msg = errorFatal && MENSAJES[errorFatal] && !sinTexto ? MENSAJES[errorFatal]
           : !hayAudio ? MSG_SIN_AUDIO
           : MSG_SIN_TEXTO;

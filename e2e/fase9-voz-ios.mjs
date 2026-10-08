@@ -10,6 +10,11 @@ const fake = () => {
     start() {
       window.__intentos++;
       const guion = window.__guiones.shift() ?? [];
+      // Modelo iPhone del usuario: solo el primer start() de cada carga de página devuelve texto.
+      window.__starts = (window.__starts ?? 0) + 1;
+      if (localStorage.getItem("fake-solo-primero") === "1" && window.__starts > 1) {
+        window.__guiones.unshift(guion); setTimeout(() => this.onaudiostart?.(), 20); return;
+      }
       // Modelo iOS (observado en un iPhone real): solo el primer reconocedor devuelve texto;
       // los creados después abren el micrófono (audiostart) pero nunca entregan resultados.
       if (window.__modoIOS) {
@@ -138,7 +143,53 @@ await p.getByRole("button", { name: "Reintentar" }).click();
 await card.waitFor({ timeout: 8000 });
 ok((await tarjeta()).includes("S/ 7.00"), "Reintentar en modo simple funciona");
 await p.click("button:has-text('Editar')"); await p.click("button:has-text('Cancelar')");
-await p.evaluate(() => { window.__soloSimple = false; });
+await p.evaluate(() => { window.__soloSimple = false; localStorage.removeItem("voz-recargar"); });
+
+// 11. Varios gastos en una frase dictada
+await dictar([[{ ms: 300, resultados: [["Un sol taxi dos soles pasaje"]], final: true }]]);
+const varios = p.locator("[aria-label='Varios movimientos']");
+await varios.waitFor({ timeout: 8000 });
+const tv = (await varios.innerText()).replace(/\s+/g, " ");
+ok(tv.includes("Entendí 2 movimientos") && tv.includes("S/ 1.00") && tv.includes("S/ 2.00") && tv.includes("Total S/ 3.00"), "«un sol taxi dos soles pasaje» → 2 movimientos");
+await varios.getByRole("button", { name: "Confirmar 2" }).click();
+await p.getByRole("status").filter({ hasText: "Registrados 2 movimientos" }).waitFor();
+ok(true, "confirmar registra los dos");
+
+// 12. iPhone donde solo el 1.er dictado de cada carga funciona → recarga automática tras dictar
+await p.evaluate(() => { localStorage.setItem("fake-solo-primero", "1"); localStorage.removeItem("voz-recargar"); });
+await p.reload();
+await mic.waitFor();
+await dictar([[{ ms: 300, resultados: [["4 soles pan"]], final: true }]]);
+await card.waitFor({ timeout: 8000 });
+await p.click("button:has-text('Confirmar')");
+await p.getByRole("status").filter({ hasText: "Registrado" }).waitFor();
+await dictar([[{ ms: 300, resultados: [["6 soles leche"]], final: true }]]);
+await p.getByText("no llegó texto").waitFor({ timeout: 10000 });
+ok((await p.evaluate(() => localStorage.getItem("voz-recargar"))) === "1", "detecta el fallo del 2.º dictado y activa la recarga");
+
+// 12b. Mientras tanto, «Dictar con el teclado» interpreta solo
+await p.getByRole("button", { name: "Dictar con el teclado" }).click();
+ok(await p.evaluate(() => document.activeElement?.getAttribute("aria-label")) === "Describe tu movimiento", "abre el campo para el micrófono del teclado");
+await p.fill("[aria-label='Describe tu movimiento']", "6 soles leche");
+await card.waitFor({ timeout: 6000 });
+ok((await tarjeta()).includes("S/ 6.00"), "el dictado del teclado se interpreta sin tocar Listo");
+await p.click("button:has-text('Confirmar')");
+await p.getByRole("status").filter({ hasText: "Registrado" }).waitFor();
+
+// 12c. Con la recarga activa: dictar → confirmar → la página se recarga → el siguiente dictado funciona
+await dictar([[{ ms: 300, resultados: [["2 soles caramelo"]], final: true }]]).catch(() => {});
+await p.reload(); // el usuario vuelve a entrar: primer dictado de la carga
+await mic.waitFor();
+await dictar([[{ ms: 300, resultados: [["3 soles agua"]], final: true }]]);
+await card.waitFor({ timeout: 8000 });
+await Promise.all([p.waitForEvent("framenavigated"), p.click("button:has-text('Confirmar')")]);
+await p.getByRole("status").filter({ hasText: "Registrado: Agua" }).waitFor({ timeout: 10000 });
+ok(true, "tras dictar se recarga sola y muestra el aviso");
+await dictar([[{ ms: 300, resultados: [["5 soles fruta"]], final: true }]]);
+await card.waitFor({ timeout: 8000 });
+ok((await tarjeta()).includes("S/ 5.00"), "el siguiente dictado funciona (vuelve a ser el primero)");
+await p.click("button:has-text('Editar')"); await p.click("button:has-text('Cancelar')");
+await p.evaluate(() => { localStorage.removeItem("fake-solo-primero"); localStorage.removeItem("voz-recargar"); });
 
 // 9. Diagnóstico con ?voz=debug
 await p.goto(B + "/?voz=debug");
@@ -150,7 +201,7 @@ ok(diag.includes("start()") && diag.includes("result") && diag.includes("stop"),
 
 const t = await token();
 const fila = await (await fetch(`${U}/rest/v1/fin_transactions?select=amount,source,category,nature`, { headers: { apikey: K, Authorization: `Bearer ${t}` } })).json();
-ok(fila.length === 4 && fila.every((f) => f.source === "voz"), `4 movimientos guardados con fuente 'voz' (${fila.length})`);
+ok(fila.length === 9 && fila.every((f) => f.source === "voz"), `9 movimientos guardados con fuente 'voz' (${fila.length})`);
 ok(errs.length === 0, "sin errores en consola" + (errs.length ? ": " + errs.join(" | ") : ""));
 await b.close();
 await reiniciar();
