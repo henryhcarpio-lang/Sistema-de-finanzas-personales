@@ -1,11 +1,11 @@
 import { GestorPresupuestos } from "@/components/GestorPresupuestos";
 import { soles } from "@/lib/dates";
-import { listarCategorias, listarPresupuestos, mesActual } from "@/lib/queries";
+import { listarCategorias, listarPresupuestos, mesActual, obtenerAjustes } from "@/lib/queries";
 
 const MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 
 export default async function PresupuestosPage() {
-  const [presupuestos, categorias] = await Promise.all([listarPresupuestos(), listarCategorias()]);
+  const [presupuestos, categorias] = await Promise.all([listarPresupuestos((await obtenerAjustes()).umbral_presupuesto / 100), listarCategorias()]);
   const { rango, dia, diasMes } = mesActual();
   const limite = presupuestos.reduce((s, p) => s + p.monthly_limit, 0);
   const gastado = presupuestos.reduce((s, p) => s + p.estado.gastado, 0);

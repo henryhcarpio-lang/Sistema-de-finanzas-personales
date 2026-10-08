@@ -1,3 +1,4 @@
+import { Settings } from "lucide-react";
 import Link from "next/link";
 import { BottomNav, SideNav } from "@/components/BottomNav";
 import { cerrarSesion } from "../login/actions";
@@ -18,7 +19,9 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
         <div className="mb-8 px-3"><Logo /></div>
         <SideNav />
         <div className="mt-auto space-y-1 border-t border-line pt-4">
-          <Link href="/categorias" className="flex min-h-11 items-center rounded-xl px-3 text-base text-muted hover:bg-bg hover:text-fg">Categorías</Link>
+          <Link href="/configuracion" className="flex min-h-11 items-center gap-3 rounded-xl px-3 text-base text-muted hover:bg-bg hover:text-fg">
+            <Settings size={22} aria-hidden /> Configuración
+          </Link>
           <form action={cerrarSesion}>
             <button className="flex min-h-11 w-full items-center rounded-xl px-3 text-base text-muted hover:bg-bg hover:text-fg">Salir</button>
           </form>
@@ -30,10 +33,9 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
           {/* Celular y tablet: cabecera compacta */}
           <header className="mb-3 flex items-center justify-between lg:hidden">
             <Logo />
-            <div className="-mr-3 flex items-center">
-              <Link href="/categorias" className="tap text-muted">Categorías</Link>
-              <form action={cerrarSesion}><button className="tap text-muted">Salir</button></form>
-            </div>
+            <Link href="/configuracion" aria-label="Configuración" className="tap -mr-2 flex items-center justify-center text-muted">
+              <Settings size={24} aria-hidden />
+            </Link>
           </header>
           <main>{children}</main>
         </div>

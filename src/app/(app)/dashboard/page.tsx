@@ -5,11 +5,12 @@ import { PeriodoSelector, leerPeriodo } from "@/components/PeriodoSelector";
 import { compararCategorias, proyeccionMes, serieGasto } from "@/lib/analisis";
 import { calendario } from "@/lib/compromisos";
 import { analizar, mesesAnteriores } from "@/lib/inteligencia";
+import { IconoCategoria } from "@/components/IconoCategoria";
 import { ResumenInteligente } from "@/components/ResumenInteligente";
 import { esUnDia, frasePeriodo, periodoAnterior, resolverPeriodo, soles, todayLima } from "@/lib/dates";
 import { CuotaFila } from "@/components/CuotaFila";
 import { BarraSobre, DetalleSobre } from "@/components/EstadoSobre";
-import { listarCompromisos, listarMovimientos, listarPagos, listarPresupuestos, resumir } from "@/lib/queries";
+import { listarCompromisos, listarMovimientos, listarPagos, listarCategorias, listarPresupuestos, mapaCategorias, obtenerAjustes, resumir } from "@/lib/queries";
 
 const str = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined);
 
@@ -18,16 +19,19 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   const hoy = todayLima();
   const { p, rango } = resolverPeriodo(leerPeriodo(sp.p), hoy, { from: str(sp.from), to: str(sp.to), d: str(sp.d) });
   const desde4Meses = `${mesesAnteriores(hoy.slice(0, 7), 3).at(-1)}-01`;
-  const [txs, prev, presupuestos, compromisos, pagos, historia] = await Promise.all([
+  const ajustes = await obtenerAjustes();
+  const [txs, prev, presupuestos, compromisos, pagos, historia, misCategorias] = await Promise.all([
     listarMovimientos({ rango }),
     listarMovimientos({ rango: periodoAnterior(rango) }),
-    listarPresupuestos(),
+    listarPresupuestos(ajustes.umbral_presupuesto / 100),
     listarCompromisos(),
     listarPagos(),
     listarMovimientos({ rango: { from: desde4Meses, to: hoy } }),
+    listarCategorias(),
   ]);
+  const cats = mapaCategorias(misCategorias);
   const analisis = analizar(historia, hoy, presupuestos.map((x) => x.category));
-  const proximos = calendario(compromisos, pagos, hoy, 7).filter((c) => c.estado !== "pagada");
+  const proximos = calendario(compromisos, pagos, hoy, ajustes.dias_aviso).filter((c) => c.estado !== "pagada");
   const totalProximos = proximos.reduce((s2, c) => s2 + c.compromiso.amount, 0);
   const enAlerta = presupuestos.filter((x) => x.estado.nivel !== "ok").slice(0, 3);
   const r = resumir(txs);
@@ -43,7 +47,10 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
 
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">Mi situación financiera</h1>
+      <div>
+        {ajustes.nombre && <p className="text-sm text-muted" data-testid="saludo">Hola, {ajustes.nombre}</p>}
+        <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">Mi situación financiera</h1>
+      </div>
       <PeriodoSelector base="/dashboard" actual={p} from={rango.from} to={rango.to} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -55,7 +62,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
 
       <div className="space-y-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
         <div className="space-y-5">
-          <ResumenInteligente a={analisis} />
+          {ajustes.resumen_inteligente && <ResumenInteligente a={analisis} />}
         {(proyeccion || delta !== null) && (
           <section className="card space-y-1 p-4 text-sm" aria-label="Tendencia">
             {proyeccion && (
@@ -90,8 +97,11 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
                 <li key={c.categoria}>
                   <Link href={`/movimientos?${qsCat(c.categoria)}`} aria-label={`Ver movimientos de ${c.categoria}`}
                     className="-mx-2 block rounded-lg px-2 py-1 transition hover:bg-bg">
-                    <div className="mb-1 flex items-baseline justify-between gap-2 text-sm">
-                      <span className="truncate">{c.categoria}</span>
+                    <div className="mb-1 flex items-center justify-between gap-2 text-sm">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <IconoCategoria icono={cats[c.categoria]?.icono} color={cats[c.categoria]?.color} size="sm" />
+                        <span className="truncate">{c.categoria}</span>
+                      </span>
                       <span className="shrink-0 tabular-nums">{soles(c.actual)} ›</span>
                     </div>
                     <div className="h-2 rounded-full bg-bg">
@@ -116,7 +126,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
         {compromisos.length > 0 && (
           <section aria-label="Próximos compromisos">
             <div className="mb-1.5 flex items-baseline justify-between px-1">
-              <h2 className="text-base font-semibold">Próximos compromisos · 7 días</h2>
+              <h2 className="text-base font-semibold">Próximos compromisos · {ajustes.dias_aviso} días</h2>
               <Link href="/pagos" className="tap -mr-3 text-muted hover:text-fg">Ver todos ›</Link>
             </div>
             {proximos.length === 0 ? (

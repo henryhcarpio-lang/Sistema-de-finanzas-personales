@@ -24,7 +24,9 @@ const draftACampos = (d: Draft): Campos => ({
   occurred_on: d.occurred_on, tags: d.tags.join(", "), note: "",
 });
 
-export function RegistroRapido({ prefs, categorias }: { prefs: Preferencia[]; categorias: Categoria[] }) {
+export function RegistroRapido({ prefs, categorias, voz: vozAjustes = { activa: true, idioma: "es-PE" }, cuenta = null }: {
+  prefs: Preferencia[]; categorias: Categoria[]; voz?: { activa: boolean; idioma: string }; cuenta?: string | null;
+}) {
   const [texto, setTexto] = useState("");
   const [estado, setEstado] = useState<Estado>({ k: "idle" });
   const [aviso, setAviso] = useState<{ ok: boolean; msg: string; extra?: { texto: string; nivel: string } } | null>(null);
@@ -56,7 +58,8 @@ export function RegistroRapido({ prefs, categorias }: { prefs: Preferencia[]; ca
 
   // De las interpretaciones del reconocedor, se usa la que tiene sentido como movimiento.
   const voz = useVozRegistro((candidatas) =>
-    interpretar(elegirCandidata(candidatas, (c) => parseMovimiento(c, todayLima(), prefs)).texto, "voz"));
+    interpretar(elegirCandidata(candidatas, (c) => parseMovimiento(c, todayLima(), prefs)).texto, "voz"), vozAjustes.idioma);
+  const conVoz = voz.soportado && vozAjustes.activa;
 
   function guardar(c: Campos, source: Fuente, confidence: number | null, sugerido?: Campos) {
     const r = camposAInput(c);
@@ -64,7 +67,7 @@ export function RegistroRapido({ prefs, categorias }: { prefs: Preferencia[]; ca
     // Si el usuario cambió la clasificación propuesta, la app aprende de ello.
     const corregido = !!sugerido && (sugerido.type !== c.type || sugerido.category !== c.category || sugerido.nature !== c.nature);
     start(async () => {
-      const res = await crearMovimiento({ ...r.input, source, confidence }, corregido);
+      const res = await crearMovimiento({ ...r.input, account: cuenta, source, confidence }, corregido);
       if (!res.ok) return setAviso({ ok: false, msg: res.error });
       const hoy = todayLima();
       const cuando = r.input.occurred_on === hoy ? "" : ` · ${etiquetaFecha(r.input.occurred_on, hoy)}`;
@@ -77,7 +80,7 @@ export function RegistroRapido({ prefs, categorias }: { prefs: Preferencia[]; ca
 
   return (
     <section className="space-y-3">
-      {voz.soportado && (
+      {conVoz && (
         <Microfono voz={voz} ocupado={pending} onIniciar={() => { setAviso(null); setEstado({ k: "idle" }); voz.iniciar(); }} />
       )}
 
@@ -87,7 +90,7 @@ export function RegistroRapido({ prefs, categorias }: { prefs: Preferencia[]; ca
           autoFocus
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
-          placeholder={voz.soportado ? "O escribe: 18 soles taxi" : "Ej.: 18 soles taxi"}
+          placeholder={conVoz ? "O escribe: 18 soles taxi" : "Ej.: 18 soles taxi"}
           aria-label="Describe tu movimiento"
           enterKeyHint="go"
           className="min-h-12 flex-1 bg-transparent px-2 text-base outline-none placeholder:text-muted"

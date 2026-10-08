@@ -17,8 +17,9 @@
   --serie-3: #1baf7a;
 }
 
+/* Tema oscuro: el del sistema, salvo que el usuario elija "claro"; o forzado con "oscuro". */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-tema="claro"]) {
     --bg: #0b0f14;
     --surface: #131a22;
     --fg: #e6edf3;
@@ -34,6 +35,27 @@
     --serie-3: #199e70;
   }
 }
+:root[data-tema="oscuro"] {
+    --bg: #0b0f14;
+    --surface: #131a22;
+    --fg: #e6edf3;
+    --muted: #8b98a5;
+    --line: #233040;
+    --brand: #2dd4bf;
+    --brand-fg: #04201d;
+    --pos: #34d399;
+    --neg: #f87171;
+    --warn: #fbbf24;
+    --serie-1: #3987e5;
+    --serie-2: #d95926;
+    --serie-3: #199e70;
+}
+
+/* Tamaño de texto elegido en Configuración (todo está en rem, así que escala junto). */
+:root[data-texto="grande"] { font-size: 112.5%; }
+:root[data-texto="muy-grande"] { font-size: 125%; }
+:root[data-tema="oscuro"] { color-scheme: dark; }
+:root[data-tema="claro"] { color-scheme: light; }
 
 @theme inline {
   --color-bg: var(--bg);

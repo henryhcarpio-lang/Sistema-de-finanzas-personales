@@ -4,7 +4,7 @@ import { sembrar4Meses } from "./sembrar4meses.mjs";
 await reiniciar();
 await sembrar4Meses();
 
-const RUTAS = ["/", "/dashboard", "/movimientos", "/movimientos?p=ayer", "/presupuestos", "/pagos", "/categorias"];
+const RUTAS = ["/", "/dashboard", "/movimientos", "/movimientos?p=ayer", "/presupuestos", "/pagos", "/categorias", "/configuracion"];
 const b = await lanzar();
 
 async function revisar(p) {

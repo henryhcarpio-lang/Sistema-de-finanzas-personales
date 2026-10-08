@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { z } from "zod";
 import { soles, todayLima } from "@/lib/dates";
 import { avisoTrasGasto, estadoPresupuesto } from "@/lib/presupuestos";
@@ -19,6 +20,7 @@ const Movimiento = z.object({
   tags: z.array(z.string().trim().min(1).max(40)).max(10),
   occurred_on: z.iso.date(),
   note: z.string().trim().max(500).nullable().optional(),
+  account: z.string().trim().max(40).nullable().optional(),
   source: z.enum(FUENTES),
   confidence: z.number().min(0).max(1).nullable(),
 });
@@ -47,7 +49,8 @@ async function avisoPresupuesto(supabase: Supa, m: MovimientoInput) {
     .eq("category", m.category).in("type", ["egreso", "deuda"])
     .gte("occurred_on", rango.from).lte("occurred_on", rango.to);
   const gastado = (filas ?? []).reduce((s, f) => s + Number(f.amount), 0);
-  const e = estadoPresupuesto(Number(b.monthly_limit), gastado, dia, diasMes);
+  const { data: aj } = await supabase.from("fin_settings").select("umbral_presupuesto").maybeSingle();
+  const e = estadoPresupuesto(Number(b.monthly_limit), gastado, dia, diasMes, (aj?.umbral_presupuesto ?? 80) / 100);
   return { texto: avisoTrasGasto(m.category, e, soles), nivel: e.nivel };
 }
 
@@ -127,9 +130,12 @@ export async function eliminarMovimiento(id: string): Promise<ActionResult> {
 const Categoria = z.object({
   name: z.string().trim().min(1).max(60),
   nature: z.enum(NATURALEZAS).nullable(),
+  grupo: z.string().trim().min(1).max(40).nullable().optional(),
+  icono: z.string().trim().min(1).max(30).nullable().optional(),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
 });
 
-export async function crearCategoria(input: z.infer<typeof Categoria>): Promise<ActionResult> {
+export async function crearCategoria(input: z.input<typeof Categoria>): Promise<ActionResult> {
   const parsed = Categoria.safeParse(input);
   if (!parsed.success) return { ok: false, error: "Nombre inválido" };
   try {
@@ -139,6 +145,32 @@ export async function crearCategoria(input: z.infer<typeof Categoria>): Promise<
     if (error) return { ok: false, error: error.code === "23505" ? "Esa categoría ya existe" : "No se pudo crear" };
     revalidar();
     return { ok: true, id: data.id };
+  } catch {
+    return { ok: false, error: "Sesión expirada" };
+  }
+}
+
+/**
+ * Edita una categoría. Si cambia el nombre, se renombra también en movimientos,
+ * presupuestos, compromisos y preferencias (función SQL transaccional).
+ */
+export async function actualizarCategoria(id: string, input: z.input<typeof Categoria>): Promise<ActionResult> {
+  if (!z.uuid().safeParse(id).success) return { ok: false, error: "Id inválido" };
+  const parsed = Categoria.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Datos inválidos" };
+  try {
+    const { supabase } = await requireUser();
+    const { data: actual } = await supabase.from("fin_categories").select("name").eq("id", id).maybeSingle();
+    if (!actual) return { ok: false, error: "Categoría no encontrada" };
+    const { name, ...resto } = parsed.data;
+    if (name !== actual.name) {
+      const { error } = await supabase.rpc("fin_renombrar_categoria", { viejo: actual.name, nuevo: name });
+      if (error) return { ok: false, error: error.code === "23505" ? "Ya tienes una categoría con ese nombre" : "No se pudo renombrar" };
+    }
+    const { error } = await supabase.from("fin_categories").update(resto).eq("id", id);
+    if (error) return { ok: false, error: "No se pudo guardar" };
+    revalidar();
+    return { ok: true, id };
   } catch {
     return { ok: false, error: "Sesión expirada" };
   }
@@ -287,6 +319,72 @@ export async function pagarCuota(recurrentId: string, dueDate: string): Promise<
     if (error) return { ok: false, error: error.code === "23505" ? "Esta cuota ya está pagada" : "No se pudo registrar el pago" };
     revalidar();
     return { ok: true, id: data.id };
+  } catch {
+    return { ok: false, error: "Sesión expirada" };
+  }
+}
+
+const AjustesInput = z.object({
+  nombre: z.string().trim().max(40).nullable(),
+  voz_idioma: z.enum(["es-PE", "es-MX", "es-ES", "es-CO", "es-AR", "es-US"]),
+  voz_activa: z.boolean(),
+  cuenta_defecto: z.string().trim().max(40).nullable(),
+  tema: z.enum(["sistema", "claro", "oscuro"]),
+  texto: z.enum(["normal", "grande", "muy-grande"]),
+  resumen_inteligente: z.boolean(),
+  dias_aviso: z.union([z.literal(3), z.literal(7), z.literal(14)]),
+  umbral_presupuesto: z.union([z.literal(70), z.literal(80), z.literal(90)]),
+}).partial();
+
+/** Guarda uno o varios ajustes. Tema y tamaño de texto van también en cookie para el primer render. */
+export async function guardarAjustes(input: z.input<typeof AjustesInput>): Promise<ActionResult> {
+  const parsed = AjustesInput.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Ajuste inválido" };
+  try {
+    const { supabase, user } = await requireUser();
+    const datos = { ...parsed.data, nombre: parsed.data.nombre === "" ? null : parsed.data.nombre, cuenta_defecto: parsed.data.cuenta_defecto === "" ? null : parsed.data.cuenta_defecto };
+    for (const k of Object.keys(datos) as (keyof typeof datos)[]) if (datos[k] === undefined) delete datos[k];
+    const { error } = await supabase.from("fin_settings")
+      .upsert({ ...datos, user_id: user.id, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+    if (error) return { ok: false, error: "No se pudo guardar" };
+    const c = await cookies();
+    const anio = 60 * 60 * 24 * 365;
+    if (datos.tema) c.set("tema", datos.tema, { maxAge: anio, path: "/", sameSite: "lax" });
+    if (datos.texto) c.set("texto", datos.texto, { maxAge: anio, path: "/", sameSite: "lax" });
+    revalidar();
+    return { ok: true, id: user.id };
+  } catch {
+    return { ok: false, error: "Sesión expirada" };
+  }
+}
+
+/** Cambia la contraseña de la sesión actual. */
+export async function cambiarContrasena(nueva: string): Promise<ActionResult> {
+  if (typeof nueva !== "string" || nueva.length < 8 || nueva.length > 72) return { ok: false, error: "La contraseña debe tener al menos 8 caracteres" };
+  try {
+    const { supabase, user } = await requireUser();
+    const { error } = await supabase.auth.updateUser({ password: nueva });
+    if (error) return { ok: false, error: error.message.includes("different") ? "Debe ser distinta de la actual" : "No se pudo cambiar la contraseña" };
+    return { ok: true, id: user.id };
+  } catch {
+    return { ok: false, error: "Sesión expirada" };
+  }
+}
+
+/**
+ * Borra todos los datos del usuario (movimientos, compromisos, presupuestos,
+ * preferencias, categorías y ajustes). Exige escribir "BORRAR".
+ */
+export async function borrarMisDatos(confirmacion: string): Promise<ActionResult> {
+  if (confirmacion !== "BORRAR") return { ok: false, error: "Escribe BORRAR para confirmar" };
+  try {
+    const { supabase, user } = await requireUser();
+    for (const t of ["fin_transactions", "fin_recurrents", "fin_budgets", "fin_preferences", "fin_categories", "fin_settings"]) {
+      const { error } = await supabase.from(t).delete().eq("user_id", user.id);
+      if (error) return { ok: false, error: "No se pudo borrar todo; inténtalo de nuevo" };
+    }
+    revalidar();
+    return { ok: true, id: user.id };
   } catch {
     return { ok: false, error: "Sesión expirada" };
   }

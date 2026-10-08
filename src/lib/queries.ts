@@ -3,7 +3,7 @@ import { requireUser } from "./supabase/server";
 import { rangoPeriodo, todayLima, type Rango } from "./dates";
 import type { Compromiso, Pago } from "./compromisos";
 import { estadoPresupuesto, type EstadoPresupuesto } from "./presupuestos";
-import { CATEGORIAS, NATURALEZA_INICIAL, type Categoria, type Preferencia, type Transaction } from "./types";
+import { CATALOGO, type Categoria, type Preferencia, type Transaction } from "./types";
 
 const COLS =
   "id,occurred_on,occurred_time,amount,currency,type,nature,category,subcategory,concept,account,tags,note,source,confidence,created_at";
@@ -81,7 +81,7 @@ export function resumir(txs: Transaction[]) {
 /** Categorías del usuario; la primera vez se crean las iniciales para que pueda editarlas. */
 export async function listarCategorias(): Promise<Categoria[]> {
   const { supabase, user } = await requireUser();
-  const { data, error } = await supabase.from("fin_categories").select("id,name,nature").order("name");
+  const { data, error } = await supabase.from("fin_categories").select("id,name,nature,grupo,icono,color").order("name");
   if (error) throw new Error("No se pudieron cargar las categorías");
   if (data.length) return data as Categoria[];
   // Se usa lo que devuelve el upsert: repetir el mismo SELECT en este render
@@ -89,10 +89,10 @@ export async function listarCategorias(): Promise<Categoria[]> {
   const { data: creadas } = await supabase
     .from("fin_categories")
     .upsert(
-      CATEGORIAS.map((name) => ({ name, nature: NATURALEZA_INICIAL[name], user_id: user.id })),
+      CATALOGO.map(([name, grupo, icono, color, nature]) => ({ name, grupo, icono, color, nature, user_id: user.id })),
       { onConflict: "user_id,name" },
     )
-    .select("id,name,nature");
+    .select("id,name,nature,grupo,icono,color");
   return ((creadas ?? []) as Categoria[]).sort((a, b) => a.name.localeCompare(b.name, "es"));
 }
 
@@ -121,7 +121,7 @@ export function mesActual(today = todayLima()) {
 }
 
 /** Presupuestos del usuario con lo gastado en el mes en curso, los más comprometidos primero. */
-export async function listarPresupuestos(): Promise<PresupuestoConEstado[]> {
+export async function listarPresupuestos(umbral?: number): Promise<PresupuestoConEstado[]> {
   const { supabase } = await requireUser();
   const { rango, dia, diasMes } = mesActual();
   const [{ data: budgets, error }, txs] = await Promise.all([
@@ -136,7 +136,7 @@ export async function listarPresupuestos(): Promise<PresupuestoConEstado[]> {
   return (budgets ?? [])
     .map((b) => {
       const limite = Number(b.monthly_limit);
-      return { ...b, monthly_limit: limite, estado: estadoPresupuesto(limite, gastado.get(b.category) ?? 0, dia, diasMes) };
+      return { ...b, monthly_limit: limite, estado: estadoPresupuesto(limite, gastado.get(b.category) ?? 0, dia, diasMes, umbral) };
     })
     .sort((a, b) => b.estado.porcentaje - a.estado.porcentaje);
 }
@@ -167,3 +167,43 @@ export async function listarPagos(): Promise<Pago[]> {
     .not("recurrent_id", "is", null).limit(5000);
   return (data ?? []).map((p) => ({ ...p, amount: Number(p.amount) })) as Pago[];
 }
+
+/** Movimientos del mes en curso por categoría (para la pantalla Categorías). */
+export async function conteoCategoriasMes(): Promise<Record<string, number>> {
+  const { supabase } = await requireUser();
+  const { rango } = mesActual();
+  const { data } = await supabase.from("fin_transactions").select("category")
+    .gte("occurred_on", rango.from).lte("occurred_on", rango.to).limit(5000);
+  const out: Record<string, number> = {};
+  for (const r of data ?? []) out[r.category] = (out[r.category] ?? 0) + 1;
+  return out;
+}
+
+export interface Ajustes {
+  nombre: string | null;
+  voz_idioma: string;
+  voz_activa: boolean;
+  cuenta_defecto: string | null;
+  tema: "sistema" | "claro" | "oscuro";
+  texto: "normal" | "grande" | "muy-grande";
+  resumen_inteligente: boolean;
+  dias_aviso: number;
+  umbral_presupuesto: number;
+}
+
+export const AJUSTES_DEFECTO: Ajustes = {
+  nombre: null, voz_idioma: "es-PE", voz_activa: true, cuenta_defecto: null, tema: "sistema", texto: "normal",
+  resumen_inteligente: true, dias_aviso: 7, umbral_presupuesto: 80,
+};
+
+/** Ajustes del usuario; si nunca guardó, los valores por defecto. */
+export async function obtenerAjustes(): Promise<Ajustes> {
+  const { supabase } = await requireUser();
+  const { data } = await supabase.from("fin_settings")
+    .select("nombre,voz_idioma,voz_activa,cuenta_defecto,tema,texto,resumen_inteligente,dias_aviso,umbral_presupuesto").maybeSingle();
+  return { ...AJUSTES_DEFECTO, ...(data ?? {}) } as Ajustes;
+}
+
+/** Mapa nombre de categoría → icono y color, para pintar listas. */
+export const mapaCategorias = (cats: Categoria[]) =>
+  Object.fromEntries(cats.map((c) => [c.name, { icono: c.icono, color: c.color }]));

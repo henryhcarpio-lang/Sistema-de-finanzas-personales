@@ -16,15 +16,15 @@ export interface EstadoPresupuesto {
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 /**
- * Estado de un sobre. Prioridad: excedido > atento (≥ 80 %) > riesgo (la
+ * Estado de un sobre. Prioridad: excedido > atento (≥ umbral, 80 % por defecto) > riesgo (la
  * proyección supera el límite) > ok. Nunca bloquea: solo informa.
  */
-export function estadoPresupuesto(limite: number, gastado: number, dia: number, diasMes: number): EstadoPresupuesto {
+export function estadoPresupuesto(limite: number, gastado: number, dia: number, diasMes: number, umbral = UMBRAL_ATENCION): EstadoPresupuesto {
   const ratio = limite > 0 ? gastado / limite : 0;
   const proyectado = dia >= 3 && gastado > 0 ? r2((gastado / dia) * diasMes) : null;
   const nivel: NivelPresupuesto =
     ratio >= 1 ? "excedido"
-    : ratio >= UMBRAL_ATENCION ? "atento"
+    : ratio >= umbral ? "atento"
     : proyectado !== null && proyectado > limite ? "riesgo"
     : "ok";
   return { limite, gastado: r2(gastado), disponible: r2(limite - gastado), porcentaje: Math.round(ratio * 100), proyectado, nivel };

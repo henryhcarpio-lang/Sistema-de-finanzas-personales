@@ -3,7 +3,7 @@ import { PeriodoSelector } from "@/components/PeriodoSelector";
 import { TxRow } from "@/components/TxList";
 import { soles } from "@/lib/dates";
 import { agrupar, aQuery, filtrosActivos, fraseResumen, leerFiltros, type Agrupacion } from "@/lib/filtros";
-import { listarCategorias, listarEtiquetas, listarMovimientos, resumir } from "@/lib/queries";
+import { listarCategorias, listarEtiquetas, listarMovimientos, mapaCategorias, resumir } from "@/lib/queries";
 import { NATURALEZAS, TIPOS } from "@/lib/types";
 
 const cap = (s: string) => s[0].toUpperCase() + s.slice(1);
@@ -21,6 +21,7 @@ export default async function MovimientosPage({ searchParams }: PageProps<"/movi
     }),
   ]);
   const r = resumir(txs);
+  const cats = mapaCategorias(categorias);
   const grupos = agrupar(txs, f.agrupar);
   const chips = filtrosActivos(f);
   const avanzados = !!(f.nat || f.tag || f.min !== undefined || f.max !== undefined);
@@ -113,7 +114,7 @@ export default async function MovimientosPage({ searchParams }: PageProps<"/movi
                 </span>
               </div>
               <ul className="card divide-y divide-line overflow-hidden">
-                {g.items.map((t) => <TxRow key={t.id} t={t} />)}
+                {g.items.map((t) => <TxRow key={t.id} t={t} cats={cats} />)}
               </ul>
             </section>
           ))}

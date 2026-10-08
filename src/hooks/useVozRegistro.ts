@@ -53,7 +53,7 @@ const sinSuscripcion = () => () => {};
  * llega completa. `onTexto` recibe las frases candidatas (alternativas del
  * reconocedor); quien llama elige la que tiene sentido como movimiento.
  */
-export function useVozRegistro(onTexto: (candidatas: string[]) => void) {
+export function useVozRegistro(onTexto: (candidatas: string[]) => void, idioma = "es-PE") {
   // Se calcula solo en el cliente: en el servidor siempre es false (sin desajuste de hidratación).
   const soportado = useSyncExternalStore(sinSuscripcion, () => constructorVoz() !== null, () => false);
   const [estado, setEstado] = useState<EstadoVoz>("inactivo");
@@ -84,7 +84,7 @@ export function useVozRegistro(onTexto: (candidatas: string[]) => void) {
     const Ctor = constructorVoz();
     if (!Ctor) return;
     const r = new Ctor();
-    r.lang = "es-PE";
+    r.lang = idioma;
     r.interimResults = true;
     r.continuous = true; // terminamos nosotros tras una pausa (iOS corta muy pronto si no)
     r.maxAlternatives = 5;
@@ -146,7 +146,7 @@ export function useVozRegistro(onTexto: (candidatas: string[]) => void) {
     }
     programarSilencio(SIN_VOZ_MS);
     tLimite.current = setTimeout(() => r.stop(), MAX_MS);
-  }, []);
+  }, [idioma]);
   useEffect(() => { reintentar.current = arrancar; }, [arrancar]);
 
   const iniciar = useCallback(() => {

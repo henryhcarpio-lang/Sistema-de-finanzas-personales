@@ -28,3 +28,11 @@ describe("avisoTrasGasto", () => {
     expect(avisoTrasGasto("Transporte", estadoPresupuesto(250, 270, 10, 30), fmt)).toBe("Superaste el presupuesto de Transporte por S/ 20.00 (108 %).");
   });
 });
+
+describe("umbral de aviso configurable", () => {
+  it("con 70 % avisa antes; con 90 % después", () => {
+    expect(estadoPresupuesto(100, 75, 2, 30, 0.7).nivel).toBe("atento");
+    expect(estadoPresupuesto(100, 85, 2, 30, 0.9).nivel).toBe("ok");
+    expect(estadoPresupuesto(100, 85, 2, 30).nivel).toBe("atento");
+  });
+});

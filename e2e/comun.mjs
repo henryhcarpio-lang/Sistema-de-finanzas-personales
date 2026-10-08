@@ -31,6 +31,7 @@ export async function reiniciar() {
   for (const tabla of ["fin_transactions", "fin_preferences", "fin_categories", "fin_budgets", "fin_recurrents"]) {
     await fetch(`${U}/rest/v1/${tabla}?id=not.is.null`, { method: "DELETE", headers: { apikey: K, Authorization: `Bearer ${t}` } });
   }
+  await fetch(`${U}/rest/v1/fin_settings?user_id=not.is.null`, { method: "DELETE", headers: { apikey: K, Authorization: `Bearer ${t}` } });
 }
 
 export async function entrar(p) {

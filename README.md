@@ -17,6 +17,8 @@ Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + 
 - **Fase 6:** presupuestos mensuales por categoría (sobres): gastado, disponible, % usado y proyección; estados *en orden*, *en riesgo* (la proyección supera el límite), *cerca del límite* (≥ 80 %) y *excedido*, siempre con icono y texto. Al registrar un gasto con presupuesto, la app dice cuánto queda. Nunca bloquea un gasto.
 - **Fase 7:** deudas y pagos recurrentes (pestaña *Pagos*). Cuotas mensuales, semanales o anuales calculadas a partir de cada compromiso; vencidas, de hoy y próximas; botón **Pagar** que crea el movimiento real vinculado a la cuota (una cuota futura nunca cuenta como gasto, y no se puede pagar dos veces). Deudas con saldo, cuotas pagadas/total, acreedor y tasa. El dashboard muestra los próximos compromisos de 7 días.
 - **Fase 8: inteligencia financiera** (sección *Tu resumen inteligente* del Resumen): resumen del mes en palabras, gastos atípicos frente a lo habitual de su categoría, categorías que suben comparadas a la misma fecha de meses anteriores, aumento de gastos en deseos y presupuestos sugeridos con botón "Usar S/ X". Con menos de 3 semanas de datos no da recomendaciones. Solo sugiere: nada se crea sin que el usuario lo toque (`src/lib/inteligencia.ts`).
+- **Categorías con grupos e iconos:** 22 categorías en 7 grupos (Comida y bebida, Estilo de vida, Familia, Hogar y servicios, Transporte, Finanzas, Otros), cada una con icono y color. Nuevas: Restaurantes, Cuidado personal, Ropa, Hijos, Mascotas, Regalos y Gasolina (el clasificador ya las usa). Tocar una categoría permite **renombrarla** (se actualiza en movimientos, presupuestos, pagos y preferencias), cambiar icono, color, grupo y naturaleza, o eliminarla.
+- **Configuración** (engranaje ⚙): nombre para el saludo; voz activa y acento (Perú, México, Colombia, Argentina, España, EE. UU.); cuenta por defecto; tema automático/claro/oscuro; tamaño de texto normal/grande/muy grande; mostrar u ocultar el resumen inteligente; días de aviso de pagos (3/7/14); umbral de aviso de presupuesto (70/80/90 %); exportar movimientos a CSV; cambiar contraseña; cerrar sesión; borrar todos los datos (hay que escribir BORRAR).
 - **Editar deudas y pagos:** cada deuda y pago recurrente tiene **Editar** (nombre, cuota, día, nº de cuotas, saldo, acreedor, tasa). Campo **"Voy en la cuota Nº"**: si un préstamo de 12 cuotas ya va en la 8, la app empieza en la 8/12 y cuenta 7 pagadas sin crear gastos falsos. Cada pago hecho aparece en *Pagos registrados* con su número de cuota y se puede editar o eliminar.
 - **Diseño táctil:** todo lo tocable mide al menos 44 px, textos de 13–16 px, campos a 16 px (sin zoom de iOS), sin zoom por doble toque; barra inferior de 5 zonas anchas en celular y barra lateral con Resumen a dos columnas en computadora.
 - **Ver un día específico:** periodos *Ayer* y *Día* (con navegación ‹ › día a día y selector de fecha) en Movimientos y Dashboard; los demás filtros se conservan al cambiar de día.
@@ -45,7 +47,7 @@ Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + 
 
 ## Configuración
 
-Proyecto Supabase: `finanzas-personales` (ref `gjcwiwmqgqlhuquyieia`, región sa-east-1). Las migraciones de `supabase/migrations/` (0001 a 0005) ya están aplicadas.
+Proyecto Supabase: `finanzas-personales` (ref `gjcwiwmqgqlhuquyieia`, región sa-east-1). Las migraciones de `supabase/migrations/` (0001 a 0006) ya están aplicadas.
 
 1. Copia `.env.example` a `.env.local`; ya incluye la URL y la clave publicable del proyecto:
 
@@ -84,7 +86,7 @@ Necesitan una cuenta de prueba confirmada en Supabase y `.env.local`. Opcional: 
 
 ## Deuda técnica / siguientes fases
 
-- Renombrar una categoría todavía no está soportado (crear + eliminar). Los movimientos guardan el nombre de la categoría como texto.
+- Los movimientos guardan el nombre de la categoría como texto (renombrar lo actualiza en una función SQL transaccional).
 - Las etiquetas aún no se aprenden de las correcciones.
 - Los presupuestos son mensuales; periodos semanales o anuales quedan para más adelante.
 - La app es instalable pero aún no funciona sin conexión (no hay service worker).

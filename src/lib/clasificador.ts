@@ -11,21 +11,22 @@ const N = "necesidad" as const;
 const D = "deseo" as const;
 const T = "Transporte", CF = "Almuerzo / comida fuera", AL = "Alimentación", SU = "Supermercado",
   VI = "Vivienda", SE = "Servicios", SA = "Salud", ED = "Educación", EN = "Entretenimiento",
-  CO = "Compras", SS = "Suscripciones", TR = "Trabajo", OT = "Otros";
+  CO = "Compras", SS = "Suscripciones", TR = "Trabajo", OT = "Otros",
+  RE = "Restaurantes", GA = "Gasolina", CP = "Cuidado personal", RO = "Ropa", HI = "Hijos", MA = "Mascotas", RG = "Regalos";
 
 const ENTRADAS: Entrada[] = [
   // Transporte
   ["taxi", T, N, "Taxi"], ["uber|cabify|indrive|didi|beat", T, N, "Taxi"],
   ["pasaje|bus|combi|micro|custer|metro de lima|metropolitano|corredor|tren|colectivo|mototaxi|moto taxi", T, N],
   ["movilidad|transporte|peaje|estacionamiento|parqueo|cochera", T, N],
-  ["gasolina|combustible|grifo|petroleo|diesel|gnv|glp", T, N],
+  ["gasolina|combustible|grifo|petroleo|diesel|gnv|glp", GA, N],
   ["mecanico|llanta|soat|revision tecnica|lavado de carro", T, N],
   ["pasaje de avion|vuelo|boleto de avion|pasaje interprovincial", T, D],
   // Comida fuera: necesidad (menú del día) vs deseo (antojos, delivery, salidas)
   ["almuerzo|menu|menu del dia|desayuno|cena|lonche|comida|comida del trabajo|tupper", CF, N],
-  ["pollo a la brasa|broaster|pizza|hamburguesa|chifa|ceviche|cevicheria|sushi|anticucho|salchipapa|tacos|parrilla|parrillada|polleria|restaurante|buffet", CF, D],
-  ["delivery|rappi|pedidosya|pedidos ya|didi food", CF, D],
-  ["kfc|mcdonalds|mc donalds|burger king|bembos|papa johns|pizza hut|dominos|norkys|roky|rokys|popeyes|chilis", CF, D],
+  ["pollo a la brasa|broaster|pizza|hamburguesa|chifa|ceviche|cevicheria|sushi|anticucho|salchipapa|tacos|parrilla|parrillada|polleria|restaurante|buffet", RE, D],
+  ["delivery|rappi|pedidosya|pedidos ya|didi food", RE, D],
+  ["kfc|mcdonalds|mc donalds|burger king|bembos|papa johns|pizza hut|dominos|norkys|roky|rokys|popeyes|chilis", RE, D],
   ["cafe|cafecito|starbucks|tambo cafe|capuchino|frappe|juane", CF, D],
   ["postre|torta|pastel|helado|heladeria|churros|crepe|donas|donuts", CF, D],
   // Alimentación en casa: básicos (necesidad) vs antojos (deseo)
@@ -35,7 +36,7 @@ const ENTRADAS: Entrada[] = [
   ["cigarro|cigarrillo|tabaco|vape", EN, D],
   // Supermercado / mercado
   ["supermercado|plaza vea|wong|tottus|metro|vivanda|makro|mass|tambo|oxxo|mercado|minimarket|compras del mes|canasta", SU, N],
-  ["detergente|jabon|shampoo|papel higienico|lejia|pasta dental|cepillo|desodorante|panales|articulos de limpieza|limpieza", SU, N],
+  ["detergente|jabon|shampoo|papel higienico|lejia|pasta dental|cepillo|desodorante|articulos de limpieza|limpieza", SU, N],
   // Vivienda
   ["alquiler|renta|mantenimiento|arbitrios|predial|hipoteca|condominio|vigilancia", VI, N],
   ["mueble|decoracion|cortina|sofa|cojin", VI, D],
@@ -44,18 +45,21 @@ const ENTRADAS: Entrada[] = [
   ["luz|recibo de luz|enel|luz del sur|agua|recibo de agua|sedapal|gas|gas natural|balon de gas|internet|wifi|cable|telefono|celular|recarga|plan movil|movistar|claro|entel|bitel|recibo", SE, N],
   // Salud
   ["medicina|medicamento|farmacia|botica|inkafarma|mifarma|pastilla|jarabe|vitamina|doctor|medico|consulta|clinica|hospital|essalud|analisis|laboratorio|dentista|odontologo|lentes|oculista|psicologo|terapia|seguro de salud|eps", SA, N],
-  ["spa|masaje|manicure|pedicure|unas acrilicas", SA, D],
-  ["peluqueria|corte de pelo|barberia|barbero", SA, N],
+  ["spa|masaje|manicure|pedicure|unas acrilicas|maquillaje|perfume", CP, D],
+  ["peluqueria|corte de pelo|barberia|barbero|crema|bloqueador|cuidado personal", CP, N],
   // Educación
   ["colegio|pension|matricula|universidad|instituto|curso|clase|taller|diplomado|maestria|utiles|utiles escolares|cuaderno|libro|fotocopia|copias|impresion|uniforme", ED, N],
   ["udemy|platzi|coursera|libro de lectura|novela", ED, D],
   // Entretenimiento
   ["cine|cineplanet|cinemark|pelicula|teatro|concierto|entrada|fiesta|discoteca|bar|karaoke|bowling|juego|videojuego|playstation|xbox|steam|salida|paseo|viaje|hotel|playa|museo|parque de diversiones", EN, D],
-  ["regalo|cumpleanos|detalle|flores", EN, D],
+  ["regalo|cumpleanos|detalle|flores|baby shower|aniversario", RG, D],
   // Compras
-  ["ropa|polo|pantalon|jean|casaca|vestido|zapatilla|zapato|sandalia|cartera|mochila|accesorio|reloj|perfume|maquillaje|joya|lentes de sol", CO, D],
+  ["ropa|polo|pantalon|jean|casaca|vestido|zapatilla|zapato|sandalia|chompa|short|falda|medias|ropa interior", RO, D],
+  ["cartera|mochila|accesorio|reloj|joya|lentes de sol", CO, D],
   ["celular nuevo|laptop|audifono|audifonos|tablet|televisor|tv|parlante|consola|tecnologia|amazon|aliexpress|shein|temu|mercado libre|falabella|ripley|oechsle|saga", CO, D],
-  ["mascota|veterinario|veterinaria|comida de perro|comida de gato|croquetas|arena de gato", OT, N],
+  ["mascota|perro|gato|veterinario|veterinaria|comida de perro|comida de gato|croquetas|arena de gato|vacuna del perro|bano del perro", MA, N],
+  // Hijos
+  ["panal|panales|pampers|huggies|leche de formula|formula de bebe|guarderia|nido|cuna|coche de bebe|juguete|juguetes|mi hijo|mi hija|los ninos|propina de mi hijo", HI, N],
   // Suscripciones
   ["netflix|spotify|youtube premium|disney|hbo|hbo max|prime video|amazon prime|apple music|icloud|google one|chatgpt|crunchyroll|paramount|star plus|xbox game pass|playstation plus", SS, D],
   ["gimnasio|gym|smart fit|bodytech|crossfit|yoga", SS, D],
