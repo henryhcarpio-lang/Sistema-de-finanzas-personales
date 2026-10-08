@@ -74,7 +74,9 @@ export function RegistroRapido({ prefs, categorias, voz: vozAjustes = { activa: 
       setAviso({ ok: true, msg: `Registrado: ${r.input.concept} · ${soles(r.input.amount)}${cuando}`, extra: res.presupuesto });
       setEstado({ k: "idle" });
       setTexto("");
-      inputRef.current?.focus();
+      // Tras un dictado no se enfoca el campo: en iPhone abriría el teclado y su dictado,
+      // que compiten por el micrófono con el siguiente registro por voz.
+      if (source !== "voz") inputRef.current?.focus();
     });
   }
 
@@ -215,6 +217,14 @@ function Microfono({ voz, ocupado, onIniciar }: {
           <span className="text-muted">Toca y dicta tu movimiento</span>
         )}
       </p>
+      {voz.estado === "error" && (
+        <button type="button" className="btn-primary w-full" onClick={onIniciar}>Reintentar</button>
+      )}
+      {voz.eventos.length > 0 && (
+        <ol className="w-full rounded-lg bg-bg p-2 font-mono text-[11px] leading-4 text-muted" data-testid="voz-diagnostico">
+          {voz.eventos.map((e, i) => <li key={i}>{e}</li>)}
+        </ol>
+      )}
       {escuchando && (
         <div className="grid w-full grid-cols-2 gap-2">
           <button type="button" className="btn-ghost" onClick={voz.cancelar}>Cancelar</button>

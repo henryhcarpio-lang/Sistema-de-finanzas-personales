@@ -15,6 +15,9 @@ interface Reconocedor {
   onresult: ((e: EventoResultado) => void) | null;
   onerror: ((e: { error: string }) => void) | null;
   onend: (() => void) | null;
+  onstart?: (() => void) | null;
+  onaudiostart?: (() => void) | null;
+  onspeechstart?: (() => void) | null;
   start(): void;
   stop(): void;
   abort(): void;
@@ -43,15 +46,33 @@ const SILENCIO_MS = 1600;
 /** Si en este tiempo no llega nada, se detiene. */
 const SIN_VOZ_MS = 6000;
 const MAX_MS = 12_000;
-/** Un fin antes de este tiempo sin texto es un fallo de arranque (frecuente en iOS): se reintenta. */
+/** Si tras pedir stop() el navegador no avisa el fin (pasa en iOS), se cierra igual. */
+const GRACIA_FIN_MS = 1500;
+/** Un fin antes de este tiempo sin texto es un fallo de arranque (frecuente en iOS): se reintenta una vez. */
 const ARRANQUE_FALLIDO_MS = 700;
 const sinSuscripcion = () => () => {};
+const MSG_SIN_AUDIO = `El micrófono no respondió. Toca «Reintentar». ${AYUDA_TECLADO}`;
+
+/** Suelta un reconocedor: sin manejadores y abortado, para que iOS libere el micrófono. */
+function liberar(r: Reconocedor | null) {
+  if (!r) return;
+  r.onresult = r.onerror = r.onend = null;
+  r.onstart = r.onaudiostart = r.onspeechstart = null;
+  try { r.abort(); } catch { /* ya terminado */ }
+}
+
+const modoDiagnostico = () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("voz") === "debug";
 
 /**
  * Dictado con el reconocimiento de voz del navegador. Escucha en modo continuo
  * y termina tras una pausa, así una frase con pausas ("dieciocho… soles taxi")
  * llega completa. `onTexto` recibe las frases candidatas (alternativas del
  * reconocedor); quien llama elige la que tiene sentido como movimiento.
+ *
+ * Robustez en iPhone: cada dictado usa un reconocedor nuevo y, al terminar, el
+ * anterior se aborta (si no, iOS puede dejar el micrófono tomado y el siguiente
+ * dictado no oye nada). Si iOS no avisa el fin, un temporizador lo cierra igual,
+ * así el botón nunca queda trabado.
  */
 export function useVozRegistro(onTexto: (candidatas: string[]) => void, idioma = "es-PE") {
   // Se calcula solo en el cliente: en el servidor siempre es false (sin desajuste de hidratación).
@@ -59,70 +80,74 @@ export function useVozRegistro(onTexto: (candidatas: string[]) => void, idioma =
   const [estado, setEstado] = useState<EstadoVoz>("inactivo");
   const [parcial, setParcial] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [eventos, setEventos] = useState<string[]>([]);
   const rec = useRef<Reconocedor | null>(null);
-  const resultados = useRef<ResultadoTexto[]>([]);
-  const cancelado = useRef(false);
+  const cerrar = useRef<(() => void) | null>(null);
   const reintentado = useRef(false);
-  const inicio = useRef(0);
-  const tSilencio = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const tLimite = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reintentar = useRef<() => void>(() => {});
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const onTextoRef = useRef(onTexto);
   useEffect(() => { onTextoRef.current = onTexto; }, [onTexto]);
-
-  const limpiarTimers = () => {
-    if (tSilencio.current) clearTimeout(tSilencio.current);
-    if (tLimite.current) clearTimeout(tLimite.current);
-    tSilencio.current = tLimite.current = null;
-  };
-  const programarSilencio = (ms: number) => {
-    if (tSilencio.current) clearTimeout(tSilencio.current);
-    tSilencio.current = setTimeout(() => rec.current?.stop(), ms);
+  const debug = useRef(false);
+  useEffect(() => { debug.current = modoDiagnostico(); }, []);
+  const t0 = useRef(0);
+  const log = (ev: string) => {
+    if (debug.current) setEventos((x) => [...x.slice(-30), `${((Date.now() - t0.current) / 1000).toFixed(2)}s ${ev}`]);
   };
 
-  const arrancar = useCallback(() => {
+  const limpiarTimers = () => { timers.current.forEach(clearTimeout); timers.current = []; };
+  const despues = (ms: number, fn: () => void) => { const t = setTimeout(fn, ms); timers.current.push(t); return t; };
+
+  const arrancar = useCallback((esReintento: boolean) => {
     const Ctor = constructorVoz();
     if (!Ctor) return;
+    liberar(rec.current);
+    limpiarTimers();
     const r = new Ctor();
     r.lang = idioma;
     r.interimResults = true;
     r.continuous = true; // terminamos nosotros tras una pausa (iOS corta muy pronto si no)
     r.maxAlternatives = 5;
-    resultados.current = [];
-    inicio.current = Date.now();
+    const inicio = Date.now();
+    let resultados: ResultadoTexto[] = [];
     let errorFatal: string | null = null;
+    let hayAudio = false;
+    let terminado = false;
+    let tSilencio: ReturnType<typeof setTimeout> | null = null;
 
-    r.onresult = (e) => {
-      const todos: ResultadoTexto[] = [];
-      for (let i = 0; i < e.results.length; i++) {
-        const res = e.results[i];
-        const alts: string[] = [];
-        for (let j = 0; j < res.length; j++) if (res[j]?.transcript) alts.push(res[j].transcript);
-        todos.push(alts);
-      }
-      resultados.current = todos;
-      setParcial(transcripciones(todos)[0] ?? "");
-      programarSilencio(SILENCIO_MS);
+    /** Pide el fin; si el navegador no responde a tiempo, se cierra igual. */
+    const pedirFin = (motivo: string) => {
+      log(`stop (${motivo})`);
+      try { r.stop(); } catch { /* ya parado */ }
+      despues(GRACIA_FIN_MS, () => { if (!terminado) { log("watchdog: sin onend, cierre forzado"); finalizar(); } });
     };
-    r.onerror = (e) => {
-      if (e.error === "aborted") return;
-      errorFatal = e.error;
+    const silencio = (ms: number) => {
+      if (tSilencio) clearTimeout(tSilencio);
+      tSilencio = despues(ms, () => pedirFin(ms === SIN_VOZ_MS ? "sin voz" : "pausa"));
     };
-    r.onend = () => {
+
+    /** Cierre único de esta sesión: libera el micrófono y entrega el texto o el error. */
+    const finalizar = () => {
+      if (terminado) return;
+      terminado = true;
       limpiarTimers();
-      rec.current = null;
-      if (cancelado.current) return;
-      const candidatas = transcripciones(resultados.current);
+      liberar(r);
+      if (rec.current === r) rec.current = null;
+      if (cerrar.current === finalizar) cerrar.current = null;
+      const candidatas = transcripciones(resultados);
       if (!candidatas.length) {
-        const rapido = Date.now() - inicio.current < ARRANQUE_FALLIDO_MS;
-        // iOS a veces termina al instante o sin captar audio: un reintento silencioso.
-        const reintentable = errorFatal === null || errorFatal === "no-speech";
-        if (!reintentado.current && reintentable && (rapido || errorFatal === "no-speech")) {
+        const rapido = Date.now() - inicio < ARRANQUE_FALLIDO_MS;
+        // iOS a veces termina al instante sin captar audio: un reintento inmediato (aún dentro del toque).
+        if (!reintentado.current && !esReintento && rapido && (errorFatal === null || errorFatal === "no-speech")) {
           reintentado.current = true;
+          log("reintento por arranque fallido");
           reintentar.current();
           return;
         }
-        setError(MENSAJES[errorFatal ?? "no-speech"] ?? `No se pudo usar el micrófono. ${AYUDA_TECLADO}`);
+        const msg = errorFatal && MENSAJES[errorFatal] ? MENSAJES[errorFatal]
+          : !hayAudio ? MSG_SIN_AUDIO
+          : MENSAJES["no-speech"];
+        setError(msg);
         setEstado("error");
         return;
       }
@@ -135,44 +160,98 @@ export function useVozRegistro(onTexto: (candidatas: string[]) => void, idioma =
       });
     };
 
+    r.onstart = () => log("start");
+    r.onaudiostart = () => { hayAudio = true; log("audiostart"); };
+    r.onspeechstart = () => { hayAudio = true; log("speechstart"); };
+    r.onresult = (e) => {
+      hayAudio = true;
+      const todos: ResultadoTexto[] = [];
+      for (let i = 0; i < e.results.length; i++) {
+        const res = e.results[i];
+        const alts: string[] = [];
+        for (let j = 0; j < res.length; j++) if (res[j]?.transcript) alts.push(res[j].transcript);
+        todos.push(alts);
+      }
+      resultados = todos;
+      const texto = transcripciones(todos)[0] ?? "";
+      log(`result «${texto}»`);
+      setParcial(texto);
+      silencio(SILENCIO_MS);
+    };
+    r.onerror = (e) => {
+      log(`error ${e.error}`);
+      if (e.error === "aborted") return;
+      errorFatal = e.error;
+    };
+    r.onend = () => { log("end"); finalizar(); };
+
     rec.current = r;
+    cerrar.current = finalizar;
+    log(esReintento ? "start() reintento" : "start()");
     try {
       r.start();
     } catch {
+      terminado = true;
+      liberar(r);
       rec.current = null;
       setError(`No se pudo iniciar el micrófono. ${AYUDA_TECLADO}`);
       setEstado("error");
       return;
     }
-    programarSilencio(SIN_VOZ_MS);
-    tLimite.current = setTimeout(() => r.stop(), MAX_MS);
+    silencio(SIN_VOZ_MS);
+    despues(MAX_MS, () => pedirFin("máximo"));
   }, [idioma]);
-  useEffect(() => { reintentar.current = arrancar; }, [arrancar]);
+  useEffect(() => { reintentar.current = () => arrancar(true); }, [arrancar]);
 
   const iniciar = useCallback(() => {
-    if (rec.current || !constructorVoz()) return;
-    cancelado.current = false;
+    if (!constructorVoz()) return;
+    // Un toque nuevo nunca se ignora: si quedó algo colgado, se suelta y se empieza de cero.
+    if (rec.current) { log("había un reconocedor colgado: se libera"); liberar(rec.current); rec.current = null; cerrar.current = null; }
+    t0.current = Date.now();
+    if (debug.current) setEventos([]);
     reintentado.current = false;
     setParcial("");
     setError(null);
     setEstado("escuchando");
-    arrancar();
+    arrancar(false);
   }, [arrancar]);
 
   /** Termina de escuchar y procesa lo dicho. */
-  const detener = useCallback(() => rec.current?.stop(), []);
+  const detener = useCallback(() => {
+    const r = rec.current;
+    if (!r) return;
+    try { r.stop(); } catch { /* ya parado */ }
+    // Si el navegador no avisa el fin, se procesa igual.
+    const fin = cerrar.current;
+    despues(GRACIA_FIN_MS, () => fin?.());
+  }, []);
 
   /** Descarta lo escuchado. */
   const cancelar = useCallback(() => {
-    cancelado.current = true;
     limpiarTimers();
-    rec.current?.abort();
+    liberar(rec.current);
     rec.current = null;
+    cerrar.current = null;
     setParcial("");
     setEstado("inactivo");
   }, []);
 
-  useEffect(() => () => { cancelado.current = true; limpiarTimers(); rec.current?.abort(); }, []);
+  // Si la app pasa a segundo plano o se bloquea la pantalla, se suelta el micrófono.
+  useEffect(() => {
+    const oculto = () => { if (document.visibilityState === "hidden" && rec.current) cancelar(); };
+    document.addEventListener("visibilitychange", oculto);
+    window.addEventListener("pagehide", cancelar);
+    return () => {
+      document.removeEventListener("visibilitychange", oculto);
+      window.removeEventListener("pagehide", cancelar);
+      limpiarTimers();
+      liberar(rec.current);
+      rec.current = null;
+    };
+  }, [cancelar]);
 
-  return { soportado, estado, parcial, error, iniciar, detener, cancelar, cerrarError: () => { setError(null); setEstado("inactivo"); } };
+  return {
+    soportado, estado, parcial, error, iniciar, detener, cancelar, eventos,
+    cerrarError: () => { setError(null); setEstado("inactivo"); },
+  };
 }
