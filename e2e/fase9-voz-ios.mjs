@@ -10,9 +10,12 @@ const fake = () => {
     start() {
       window.__intentos++;
       const guion = window.__guiones.shift() ?? [];
-      // Modelo iOS: si un reconocedor anterior no se abortó, el micrófono sigue tomado y no llega audio.
-      if (window.__modoIOS && window.__microOcupado) { window.__sinAudio = (window.__sinAudio ?? 0) + 1; return; }
-      window.__microOcupado = true;
+      // Modelo iOS (observado en un iPhone real): solo el primer reconocedor devuelve texto;
+      // los creados después abren el micrófono (audiostart) pero nunca entregan resultados.
+      if (window.__modoIOS) {
+        window.__primera ??= this;
+        if (this !== window.__primera) { window.__sinAudio = (window.__sinAudio ?? 0) + 1; setTimeout(() => this.onaudiostart?.(), 20); return; }
+      }
       // Fallo de algunos iPhone: en modo continuo abre el micrófono pero nunca devuelve texto.
       if (window.__soloSimple && this.continuous) { setTimeout(() => this.onaudiostart?.(), 20); window.__guiones.unshift(guion); return; }
       this._colgado = guion.some((p) => p.colgado);
@@ -28,7 +31,7 @@ const fake = () => {
       }, paso.ms));
     }
     stop() { this._ts?.forEach(clearTimeout); if (!this._colgado) setTimeout(() => this.onend?.(), 10); }
-    abort() { window.__abortos = (window.__abortos ?? 0) + 1; window.__microOcupado = false; this._ts?.forEach(clearTimeout); this.onerror?.({ error: "aborted" }); this.onend?.(); }
+    abort() { window.__abortos = (window.__abortos ?? 0) + 1; this._ts?.forEach(clearTimeout); this.onerror?.({ error: "aborted" }); this.onend?.(); }
   }
   window.SpeechRecognition = SafariRec;
   window.webkitSpeechRecognition = SafariRec;
@@ -94,7 +97,7 @@ await p.getByText("micrófono del teclado").waitFor({ timeout: 8000 });
 ok(true, "si falla dos veces, sugiere el dictado del teclado");
 
 // 6. Varios dictados seguidos con registro en medio (el fallo reportado en iPhone)
-await p.evaluate(() => { window.__modoIOS = true; window.__microOcupado = false; window.__abortos = 0; window.__sinAudio = 0; });
+await p.evaluate(() => { window.__modoIOS = true; window.__primera = undefined; window.__sinAudio = 0; });
 for (const [frase, monto] of [["12 soles taxi", "12.00"], ["8 soles pan", "8.00"], ["20 soles gasolina", "20.00"]]) {
   await dictar([[{ ms: 300, resultados: [[frase]], final: true }]]);
   await card.waitFor({ timeout: 8000 });
@@ -102,8 +105,7 @@ for (const [frase, monto] of [["12 soles taxi", "12.00"], ["8 soles pan", "8.00"
   await p.click("button:has-text('Confirmar')");
   await p.getByRole("status").filter({ hasText: `Registrado` }).filter({ hasText: monto }).waitFor();
 }
-ok((await p.evaluate(() => window.__sinAudio)) === 0, "el micrófono se libera entre dictados (nunca queda tomado)");
-ok((await p.evaluate(() => window.__abortos)) >= 3, "cada reconocedor terminado se aborta");
+ok((await p.evaluate(() => window.__sinAudio)) === 0, "se reutiliza el mismo reconocedor: el 2.º y 3.º dictado también devuelven texto");
 ok((await p.evaluate(() => document.activeElement?.tagName)) !== "INPUT", "tras dictar, el foco no va al campo de texto");
 
 // 7. iOS no avisa el fin tras stop(): el seguro cierra igual y el siguiente toque funciona

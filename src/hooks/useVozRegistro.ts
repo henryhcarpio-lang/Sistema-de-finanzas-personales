@@ -53,12 +53,19 @@ const ARRANQUE_FALLIDO_MS = 700;
 const sinSuscripcion = () => () => {};
 const MSG_SIN_AUDIO = `El micrófono no respondió. Toca «Reintentar». ${AYUDA_TECLADO}`;
 
-/** Suelta un reconocedor: sin manejadores y abortado, para que iOS libere el micrófono. */
-function liberar(r: Reconocedor | null) {
+/**
+ * Un único reconocedor por página. En iPhone (Safari) el primer reconocedor
+ * funciona, pero los que se crean después abren el micrófono y no devuelven
+ * texto; reutilizar el mismo objeto evita ese fallo.
+ */
+let compartido: Reconocedor | null = null;
+
+/** Quita los manejadores; si la sesión no terminó sola, la aborta para soltar el micrófono. */
+function liberar(r: Reconocedor | null, abortar = true) {
   if (!r) return;
   r.onresult = r.onerror = r.onend = null;
   r.onstart = r.onaudiostart = r.onspeechstart = null;
-  try { r.abort(); } catch { /* ya terminado */ }
+  if (abortar) try { r.abort(); } catch { /* ya terminado */ }
 }
 
 /**
@@ -98,7 +105,7 @@ export function useVozRegistro(onTexto: (candidatas: string[]) => void, idioma =
   const [error, setError] = useState<string | null>(null);
   const [eventos, setEventos] = useState<string[]>([]);
   const rec = useRef<Reconocedor | null>(null);
-  const cerrar = useRef<(() => void) | null>(null);
+  const cerrar = useRef<((natural?: boolean) => void) | null>(null);
   const reintentado = useRef(false);
   const reintentar = useRef<() => void>(() => {});
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -119,7 +126,9 @@ export function useVozRegistro(onTexto: (candidatas: string[]) => void, idioma =
     if (!Ctor) return;
     liberar(rec.current);
     limpiarTimers();
-    const r = new Ctor();
+    const nuevo = !compartido;
+    const r = compartido ?? new Ctor();
+    compartido = r;
     r.lang = idioma;
     r.interimResults = true;
     const modo = modoGuardado();
@@ -136,7 +145,7 @@ export function useVozRegistro(onTexto: (candidatas: string[]) => void, idioma =
     const pedirFin = (motivo: string) => {
       log(`stop (${motivo})`);
       try { r.stop(); } catch { /* ya parado */ }
-      despues(GRACIA_FIN_MS, () => { if (!terminado) { log("watchdog: sin onend, cierre forzado"); finalizar(); } });
+      despues(GRACIA_FIN_MS, () => { if (!terminado) { log("watchdog: sin onend, cierre forzado"); finalizar(false); } });
     };
     const silencio = (ms: number) => {
       if (tSilencio) clearTimeout(tSilencio);
@@ -144,11 +153,11 @@ export function useVozRegistro(onTexto: (candidatas: string[]) => void, idioma =
     };
 
     /** Cierre único de esta sesión: libera el micrófono y entrega el texto o el error. */
-    const finalizar = () => {
+    const finalizar = (natural = true) => {
       if (terminado) return;
       terminado = true;
       limpiarTimers();
-      liberar(r);
+      liberar(r, !natural);
       if (rec.current === r) rec.current = null;
       if (cerrar.current === finalizar) cerrar.current = null;
       const candidatas = transcripciones(resultados);
@@ -204,16 +213,17 @@ export function useVozRegistro(onTexto: (candidatas: string[]) => void, idioma =
       if (e.error === "aborted") return;
       errorFatal = e.error;
     };
-    r.onend = () => { log("end"); finalizar(); };
+    r.onend = () => { log("end"); finalizar(true); };
 
     rec.current = r;
     cerrar.current = finalizar;
-    log(`${esReintento ? "start() reintento" : "start()"} modo ${modo}`);
+    log(`${esReintento ? "start() reintento" : "start()"} modo ${modo}${nuevo ? " (nuevo)" : " (reutilizado)"}`);
     try {
       r.start();
     } catch {
       terminado = true;
       liberar(r);
+      compartido = null; // el próximo toque prueba con uno nuevo
       rec.current = null;
       setError(`No se pudo iniciar el micrófono. ${AYUDA_TECLADO}`);
       setEstado("error");
@@ -244,7 +254,7 @@ export function useVozRegistro(onTexto: (candidatas: string[]) => void, idioma =
     try { r.stop(); } catch { /* ya parado */ }
     // Si el navegador no avisa el fin, se procesa igual.
     const fin = cerrar.current;
-    despues(GRACIA_FIN_MS, () => fin?.());
+    despues(GRACIA_FIN_MS, () => fin?.(false));
   }, []);
 
   /** Descarta lo escuchado. */

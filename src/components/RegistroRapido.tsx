@@ -83,7 +83,7 @@ export function RegistroRapido({ prefs, categorias, voz: vozAjustes = { activa: 
   return (
     <section className="space-y-3">
       {conVoz && (
-        <Microfono voz={voz} ocupado={pending} onIniciar={() => { setAviso(null); setEstado({ k: "idle" }); voz.iniciar(); }} />
+        <Microfono voz={voz} ocupado={pending} onTeclado={() => { voz.cerrarError(); inputRef.current?.focus(); }} onIniciar={() => { setAviso(null); setEstado({ k: "idle" }); voz.iniciar(); }} />
       )}
 
       <form onSubmit={(e) => { e.preventDefault(); interpretar(texto, "texto"); }} className="card flex items-center gap-2 p-2">
@@ -182,8 +182,8 @@ function Confianza({ valor }: { valor: number }) {
   return <p className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>{txt}</p>;
 }
 
-function Microfono({ voz, ocupado, onIniciar }: {
-  voz: ReturnType<typeof useVozRegistro>; ocupado: boolean; onIniciar: () => void;
+function Microfono({ voz, ocupado, onIniciar, onTeclado }: {
+  voz: ReturnType<typeof useVozRegistro>; ocupado: boolean; onIniciar: () => void; onTeclado: () => void;
 }) {
   const escuchando = voz.estado === "escuchando";
   const procesando = voz.estado === "procesando";
@@ -218,7 +218,10 @@ function Microfono({ voz, ocupado, onIniciar }: {
         )}
       </p>
       {voz.estado === "error" && (
-        <button type="button" className="btn-primary w-full" onClick={onIniciar}>Reintentar</button>
+        <div className="grid w-full grid-cols-2 gap-2">
+          <button type="button" className="btn-ghost" onClick={onTeclado}>Dictar con el teclado</button>
+          <button type="button" className="btn-primary" onClick={onIniciar}>Reintentar</button>
+        </div>
       )}
       {voz.eventos.length > 0 && (
         <ol className="w-full rounded-lg bg-bg p-2 font-mono text-[11px] leading-4 text-muted" data-testid="voz-diagnostico">
