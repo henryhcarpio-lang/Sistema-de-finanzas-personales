@@ -61,6 +61,22 @@ function liberar(r: Reconocedor | null) {
   try { r.abort(); } catch { /* ya terminado */ }
 }
 
+/**
+ * Modo de escucha. "continuo": escucha con pausas y cortamos nosotros (mejor en
+ * Chrome). "simple": el navegador corta solo tras la frase; en algunos iPhone el
+ * modo continuo abre el micrófono pero nunca devuelve texto. Si un modo falla
+ * así, se prueba el otro y se recuerda el que funciona.
+ */
+type Modo = "continuo" | "simple";
+const esIOS = () => typeof navigator !== "undefined" &&
+  (/iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.userAgent.includes("Mac") && navigator.maxTouchPoints > 1));
+function modoGuardado(): Modo {
+  try { const m = localStorage.getItem("voz-modo"); if (m === "continuo" || m === "simple") return m; } catch { /* sin almacenamiento */ }
+  return esIOS() ? "simple" : "continuo";
+}
+function guardarModo(m: Modo) { try { localStorage.setItem("voz-modo", m); } catch { /* sin almacenamiento */ } }
+const MSG_SIN_TEXTO = "El micrófono se abrió pero no llegó texto. Toca «Reintentar» (probaré otro modo). Si sigue igual, revisa que el Dictado esté activado en Ajustes › General › Teclado.";
+
 const modoDiagnostico = () => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("voz") === "debug";
 
 /**
@@ -106,7 +122,8 @@ export function useVozRegistro(onTexto: (candidatas: string[]) => void, idioma =
     const r = new Ctor();
     r.lang = idioma;
     r.interimResults = true;
-    r.continuous = true; // terminamos nosotros tras una pausa (iOS corta muy pronto si no)
+    const modo = modoGuardado();
+    r.continuous = modo === "continuo";
     r.maxAlternatives = 5;
     const inicio = Date.now();
     let resultados: ResultadoTexto[] = [];
@@ -144,13 +161,17 @@ export function useVozRegistro(onTexto: (candidatas: string[]) => void, idioma =
           reintentar.current();
           return;
         }
-        const msg = errorFatal && MENSAJES[errorFatal] ? MENSAJES[errorFatal]
+        // Micrófono abierto pero sin texto: el siguiente intento usa el otro modo.
+        const sinTexto = hayAudio && (errorFatal === null || errorFatal === "no-speech");
+        if (sinTexto) { guardarModo(modo === "continuo" ? "simple" : "continuo"); log(`sin texto: próximo modo ${modo === "continuo" ? "simple" : "continuo"}`); }
+        const msg = errorFatal && MENSAJES[errorFatal] && !sinTexto ? MENSAJES[errorFatal]
           : !hayAudio ? MSG_SIN_AUDIO
-          : MENSAJES["no-speech"];
+          : MSG_SIN_TEXTO;
         setError(msg);
         setEstado("error");
         return;
       }
+      guardarModo(modo);
       setEstado("procesando");
       // Un frame para que se vea "Procesando…" antes de mostrar la tarjeta.
       requestAnimationFrame(() => {
@@ -187,7 +208,7 @@ export function useVozRegistro(onTexto: (candidatas: string[]) => void, idioma =
 
     rec.current = r;
     cerrar.current = finalizar;
-    log(esReintento ? "start() reintento" : "start()");
+    log(`${esReintento ? "start() reintento" : "start()"} modo ${modo}`);
     try {
       r.start();
     } catch {

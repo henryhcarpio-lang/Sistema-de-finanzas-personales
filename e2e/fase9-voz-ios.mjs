@@ -13,6 +13,8 @@ const fake = () => {
       // Modelo iOS: si un reconocedor anterior no se abortó, el micrófono sigue tomado y no llega audio.
       if (window.__modoIOS && window.__microOcupado) { window.__sinAudio = (window.__sinAudio ?? 0) + 1; return; }
       window.__microOcupado = true;
+      // Fallo de algunos iPhone: en modo continuo abre el micrófono pero nunca devuelve texto.
+      if (window.__soloSimple && this.continuous) { setTimeout(() => this.onaudiostart?.(), 20); window.__guiones.unshift(guion); return; }
       this._colgado = guion.some((p) => p.colgado);
       this._ts = guion.map((paso) => setTimeout(() => {
         if (paso.fin) { this.onend?.(); return; }
@@ -123,6 +125,18 @@ await p.getByRole("button", { name: "Reintentar" }).click();
 await card.waitFor({ timeout: 8000 });
 ok((await tarjeta()).includes("S/ 15.00"), "Reintentar vuelve a escuchar");
 await p.click("button:has-text('Editar')"); await p.click("button:has-text('Cancelar')");
+
+// 10. Micrófono abierto pero sin texto en modo continuo → mensaje y Reintentar usa el modo simple
+await p.evaluate(() => { localStorage.setItem("voz-modo", "continuo"); window.__soloSimple = true; window.__modoIOS = false; });
+await dictar([[{ ms: 300, resultados: [["7 soles pan"]], final: true }]]);
+await p.getByText("no llegó texto").waitFor({ timeout: 10000 });
+ok(true, "audio sin texto: avisa y sugiere revisar el Dictado");
+ok((await p.evaluate(() => localStorage.getItem("voz-modo"))) === "simple", "el próximo intento usará el modo simple");
+await p.getByRole("button", { name: "Reintentar" }).click();
+await card.waitFor({ timeout: 8000 });
+ok((await tarjeta()).includes("S/ 7.00"), "Reintentar en modo simple funciona");
+await p.click("button:has-text('Editar')"); await p.click("button:has-text('Cancelar')");
+await p.evaluate(() => { window.__soloSimple = false; });
 
 // 9. Diagnóstico con ?voz=debug
 await p.goto(B + "/?voz=debug");
