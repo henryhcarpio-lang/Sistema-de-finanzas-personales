@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { transcripciones, type ResultadoTexto } from "@/lib/transcripcion";
+import { grabar, puedeGrabar, type Grabacion } from "@/lib/voz/grabador";
+import { elegirMotor, type AjusteMotor, type Motor } from "@/lib/voz/motor";
+import { modeloDescargado, precargar, transcribir } from "@/lib/voz/whisper";
 
 // Tipos mínimos de la Web Speech API (no están en lib.dom de TypeScript).
 interface AlternativaVoz { transcript: string }
@@ -30,7 +33,7 @@ function constructorVoz(): ConstructorReconocedor | null {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 }
 
-export type EstadoVoz = "inactivo" | "escuchando" | "procesando" | "error";
+export type EstadoVoz = "inactivo" | "escuchando" | "preparando" | "procesando" | "error";
 
 const AYUDA_TECLADO = "Si la voz falla, toca el campo de texto y usa el micrófono del teclado 🎤.";
 const MENSAJES: Record<string, string> = {
@@ -87,6 +90,12 @@ function modoGuardado(): Modo {
  * "recargar tras dictar": la página se recarga sola después de cada registro
  * por voz, así cada dictado vuelve a ser el primero.
  */
+/** Web Speech ya falló en este dispositivo (abrió el micrófono sin devolver texto). */
+const FALLA_NAV = "voz-navegador-falla";
+const navegadorFallo = () => { try { return localStorage.getItem(FALLA_NAV) === "1"; } catch { return false; } };
+const marcarFallaNavegador = () => { try { localStorage.setItem(FALLA_NAV, "1"); } catch { /* */ } };
+const MSG_PASA_A_WHISPER = "El reconocimiento del navegador no devolvió texto. Toca «Reintentar»: usaré la voz sin conexión, que funciona en este teléfono.";
+
 export const recargaTrasDictar = () => { try { return localStorage.getItem("voz-recargar") === "1"; } catch { return false; } };
 function marcarRecarga(v: boolean) { try { localStorage.setItem("voz-recargar", v ? "1" : "0"); } catch { /* sin almacenamiento */ } }
 
@@ -106,9 +115,13 @@ const modoDiagnostico = () => typeof window !== "undefined" && new URLSearchPara
  * dictado no oye nada). Si iOS no avisa el fin, un temporizador lo cierra igual,
  * así el botón nunca queda trabado.
  */
-export function useVozRegistro(onTexto: (candidatas: string[]) => void, idioma = "es-PE") {
+export function useVozRegistro(onTexto: (candidatas: string[]) => void, idioma = "es-PE", ajusteMotor: AjusteMotor = "auto") {
   // Se calcula solo en el cliente: en el servidor siempre es false (sin desajuste de hidratación).
-  const soportado = useSyncExternalStore(sinSuscripcion, () => constructorVoz() !== null, () => false);
+  const soportado = useSyncExternalStore(sinSuscripcion, () => constructorVoz() !== null || puedeGrabar(), () => false);
+  const [progreso, setProgreso] = useState<number | null>(null);
+  const [motor, setMotor] = useState<Motor | null>(null);
+  const grab = useRef<Grabacion | null>(null);
+  const sesion = useRef(0);
   const [estado, setEstado] = useState<EstadoVoz>("inactivo");
   const [parcial, setParcial] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -184,10 +197,12 @@ export function useVozRegistro(onTexto: (candidatas: string[]) => void, idioma =
         if (sinTexto) {
           guardarModo(modo === "continuo" ? "simple" : "continuo");
           log(`sin texto: próximo modo ${modo === "continuo" ? "simple" : "continuo"}`);
-          if (!nuevo) { marcarRecarga(true); log("falló un dictado posterior al primero: se recargará tras cada dictado"); }
+          if (puedeGrabar()) { marcarFallaNavegador(); log("Web Speech sin texto: el próximo dictado usará Whisper local"); }
+          else if (!nuevo) { marcarRecarga(true); log("falló un dictado posterior al primero: se recargará tras cada dictado"); }
         }
         const msg = errorFatal && MENSAJES[errorFatal] && !sinTexto ? MENSAJES[errorFatal]
           : !hayAudio ? MSG_SIN_AUDIO
+          : puedeGrabar() ? MSG_PASA_A_WHISPER
           : MSG_SIN_TEXTO;
         setError(msg);
         setEstado("error");
@@ -247,21 +262,73 @@ export function useVozRegistro(onTexto: (candidatas: string[]) => void, idioma =
   }, [idioma]);
   useEffect(() => { reintentar.current = () => arrancar(true); }, [arrancar]);
 
+  /** Whisper local: graba, corta tras una pausa, suelta el micrófono y transcribe en el dispositivo. */
+  const iniciarWhisper = useCallback(async () => {
+    const mia = ++sesion.current;
+    const vigente = () => sesion.current === mia;
+    setEstado("escuchando");
+    log(`motor whisper${modeloDescargado() ? "" : " (modelo aún no descargado)"}`);
+    const g = grabar({ onLog: log });
+    grab.current = g;
+    // El modelo se prepara mientras hablas (la primera vez se descarga).
+    const carga = precargar((pct) => { if (vigente()) setProgreso(pct); });
+    carga.catch(() => {});
+    const f = await g.fin;
+    if (grab.current === g) grab.current = null;
+    if (!vigente() || f.tipo === "cancelado") return;
+    if (f.tipo === "sin-voz") { setError(MENSAJES["no-speech"]); setEstado("error"); return; }
+    if (f.tipo === "error") {
+      log(`error ${f.detalle}`);
+      setError(f.codigo === "permiso" ? MENSAJES["not-allowed"] : f.codigo === "sin-microfono" ? MENSAJES["audio-capture"] : `No se pudo grabar. ${AYUDA_TECLADO}`);
+      setEstado("error");
+      return;
+    }
+    try {
+      if (!modeloDescargado()) setEstado("preparando");
+      const tc = performance.now();
+      await carga;
+      if (!vigente()) return;
+      log(`modelo listo (${Math.round(performance.now() - tc)} ms)`);
+      setProgreso(null);
+      setEstado("procesando");
+      const { texto, ms } = await transcribir(f.audio);
+      if (!vigente()) return;
+      log(`whisper ${ms} ms «${texto}»`);
+      if (!texto) { setError(MENSAJES["no-speech"]); setEstado("error"); return; }
+      onTextoRef.current([texto]);
+      setEstado("inactivo");
+      setParcial("");
+    } catch (e) {
+      if (!vigente()) return;
+      log(`error whisper ${String(e)}`);
+      setProgreso(null);
+      setError(modeloDescargado()
+        ? `No se pudo transcribir. ${AYUDA_TECLADO}`
+        : `Sin internet para preparar la voz sin conexión (solo hace falta la primera vez). ${AYUDA_TECLADO}`);
+      setEstado("error");
+    }
+  }, []);
+
   const iniciar = useCallback(() => {
-    if (!constructorVoz()) return;
-    // Un toque nuevo nunca se ignora: si quedó algo colgado, se suelta y se empieza de cero.
-    if (rec.current) { log("había un reconocedor colgado: se libera"); liberar(rec.current); rec.current = null; cerrar.current = null; }
+    const m = elegirMotor(ajusteMotor, { webSpeech: constructorVoz() !== null, grabacion: puedeGrabar() }, navegadorFallo());
+    if (!m) return;
     t0.current = Date.now();
     if (debug.current) setEventos([]);
-    reintentado.current = false;
+    setMotor(m);
     setParcial("");
     setError(null);
+    setProgreso(null);
+    if (m === "whisper") { void iniciarWhisper(); return; }
+    // Un toque nuevo nunca se ignora: si quedó algo colgado, se suelta y se empieza de cero.
+    if (rec.current) { log("había un reconocedor colgado: se libera"); liberar(rec.current); rec.current = null; cerrar.current = null; }
+    reintentado.current = false;
     setEstado("escuchando");
     arrancar(false);
-  }, [arrancar]);
+  }, [arrancar, ajusteMotor, iniciarWhisper]);
 
   /** Termina de escuchar y procesa lo dicho. */
   const detener = useCallback(() => {
+    if (grab.current) { grab.current.detener(); return; }
     const r = rec.current;
     if (!r) return;
     try { r.stop(); } catch { /* ya parado */ }
@@ -272,6 +339,10 @@ export function useVozRegistro(onTexto: (candidatas: string[]) => void, idioma =
 
   /** Descarta lo escuchado. */
   const cancelar = useCallback(() => {
+    sesion.current++;
+    grab.current?.cancelar();
+    grab.current = null;
+    setProgreso(null);
     limpiarTimers();
     liberar(rec.current);
     rec.current = null;
@@ -282,7 +353,7 @@ export function useVozRegistro(onTexto: (candidatas: string[]) => void, idioma =
 
   // Si la app pasa a segundo plano o se bloquea la pantalla, se suelta el micrófono.
   useEffect(() => {
-    const oculto = () => { if (document.visibilityState === "hidden" && rec.current) cancelar(); };
+    const oculto = () => { if (document.visibilityState === "hidden" && (rec.current || grab.current)) cancelar(); };
     document.addEventListener("visibilitychange", oculto);
     window.addEventListener("pagehide", cancelar);
     return () => {
@@ -294,8 +365,14 @@ export function useVozRegistro(onTexto: (candidatas: string[]) => void, idioma =
     };
   }, [cancelar]);
 
+  // Si este dispositivo usará Whisper y el modelo ya está en caché, se carga en memoria al abrir.
+  useEffect(() => {
+    const m = elegirMotor(ajusteMotor, { webSpeech: constructorVoz() !== null, grabacion: puedeGrabar() }, navegadorFallo());
+    if (m === "whisper" && modeloDescargado()) precargar().catch(() => {});
+  }, [ajusteMotor]);
+
   return {
-    soportado, estado, parcial, error, iniciar, detener, cancelar, eventos,
+    soportado, estado, parcial, error, iniciar, detener, cancelar, eventos, progreso, motor,
     cerrarError: () => { setError(null); setEstado("inactivo"); },
   };
 }

@@ -95,9 +95,9 @@ ok(true, "permiso denegado → mensaje claro");
 await shot("voz-error");
 ok(p.errs.length === 0, "sin errores en consola" + (p.errs.length ? ": " + p.errs.join(" | ") : ""));
 
-// 6. Navegador sin soporte: se elimina la API antes de cargar la página
+// 6. Navegador sin ningún soporte de voz (ni Web Speech ni grabación para Whisper local)
 const ctx2 = await b.newContext({ viewport: { width: 375, height: 740 } });
-await ctx2.addInitScript(() => { delete window.SpeechRecognition; delete window.webkitSpeechRecognition; });
+await ctx2.addInitScript(() => { delete window.SpeechRecognition; delete window.webkitSpeechRecognition; delete window.MediaRecorder; });
 const q = await ctx2.newPage();
 await entrar(q);
 await q.getByLabel("Describe tu movimiento").waitFor();

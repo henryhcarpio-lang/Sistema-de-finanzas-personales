@@ -3,9 +3,10 @@
 import { ChevronRight, Download, KeyRound, LogOut, Tags, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { borrarMisDatos, cambiarContrasena, guardarAjustes } from "@/app/actions";
 import { cerrarSesion } from "@/app/login/actions";
+import { modeloDescargado, precargar } from "@/lib/voz/whisper";
 import type { Ajustes as AjustesT } from "@/lib/queries";
 
 const IDIOMAS = [["es-PE", "Perú"], ["es-MX", "México"], ["es-CO", "Colombia"], ["es-AR", "Argentina"], ["es-ES", "España"], ["es-US", "EE. UU."]] as const;
@@ -104,6 +105,14 @@ export function Ajustes({ inicial, correo }: { inicial: AjustesT; correo: string
           <select className="field" aria-label="Acento de la voz" value={a.voz_idioma} onChange={(e) => cambiar("voz_idioma", e.target.value)}>
             {IDIOMAS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
+        </Fila>
+        <Fila titulo="Motor de voz" ayuda="Automático usa el del navegador y, si falla en tu teléfono, la voz sin conexión (Whisper, gratis, en tu dispositivo).">
+          <select className="field" aria-label="Motor de voz" value={a.voz_motor} onChange={(e) => cambiar("voz_motor", e.target.value as AjustesT["voz_motor"])}>
+            <option value="auto">Automático</option>
+            <option value="navegador">Navegador (más rápido)</option>
+            <option value="whisper">Sin conexión (Whisper)</option>
+          </select>
+          <DescargarVoz />
         </Fila>
         <Fila titulo="Cuenta por defecto" ayuda="Se guarda en cada movimiento nuevo.">
           <select className="field" aria-label="Cuenta por defecto" value={a.cuenta_defecto ?? ""} onChange={(e) => cambiar("cuenta_defecto", e.target.value || null)}>
@@ -230,5 +239,22 @@ function BorrarDatos() {
         <button className="btn bg-neg text-white" disabled={pending}>Borrar todo</button>
       </div>
     </form>
+  );
+}
+
+/** Descarga anticipada del modelo de voz sin conexión (útil con Wi-Fi). */
+function DescargarVoz() {
+  const [estado, setEstado] = useState<"inicio" | "bajando" | "listo" | "error">("inicio");
+  const [pct, setPct] = useState(0);
+  useEffect(() => { if (modeloDescargado()) setTimeout(() => setEstado("listo"), 0); }, []);
+  if (estado === "listo") return <p className="text-sm text-pos" data-testid="voz-descargada">✓ Voz sin conexión lista en este dispositivo</p>;
+  return (
+    <div className="space-y-1">
+      <button type="button" className="btn-ghost w-full" disabled={estado === "bajando"}
+        onClick={() => { setEstado("bajando"); precargar(setPct).then(() => setEstado("listo"), () => setEstado("error")); }}>
+        {estado === "bajando" ? `Descargando voz sin conexión… ${pct} %` : "Descargar voz sin conexión (~60 MB)"}
+      </button>
+      {estado === "error" && <p role="alert" className="text-sm text-neg">No se pudo descargar. Revisa tu conexión e inténtalo de nuevo.</p>}
+    </div>
   );
 }

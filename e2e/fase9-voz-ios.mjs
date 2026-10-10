@@ -38,6 +38,8 @@ const fake = () => {
     stop() { this._ts?.forEach(clearTimeout); if (!this._colgado) setTimeout(() => this.onend?.(), 10); }
     abort() { window.__abortos = (window.__abortos ?? 0) + 1; this._ts?.forEach(clearTimeout); this.onerror?.({ error: "aborted" }); this.onend?.(); }
   }
+  // Esta suite prueba el motor Web Speech por sí solo (sin el respaldo Whisper local, ver fase13).
+  delete window.MediaRecorder;
   window.SpeechRecognition = SafariRec;
   window.webkitSpeechRecognition = SafariRec;
 };

@@ -183,6 +183,7 @@ export interface Ajustes {
   nombre: string | null;
   voz_idioma: string;
   voz_activa: boolean;
+  voz_motor: "auto" | "navegador" | "whisper";
   cuenta_defecto: string | null;
   tema: "sistema" | "claro" | "oscuro";
   texto: "normal" | "grande" | "muy-grande";
@@ -192,7 +193,7 @@ export interface Ajustes {
 }
 
 export const AJUSTES_DEFECTO: Ajustes = {
-  nombre: null, voz_idioma: "es-PE", voz_activa: true, cuenta_defecto: null, tema: "sistema", texto: "normal",
+  nombre: null, voz_idioma: "es-PE", voz_activa: true, voz_motor: "auto", cuenta_defecto: null, tema: "sistema", texto: "normal",
   resumen_inteligente: true, dias_aviso: 7, umbral_presupuesto: 80,
 };
 
@@ -200,7 +201,7 @@ export const AJUSTES_DEFECTO: Ajustes = {
 export async function obtenerAjustes(): Promise<Ajustes> {
   const { supabase } = await requireUser();
   const { data } = await supabase.from("fin_settings")
-    .select("nombre,voz_idioma,voz_activa,cuenta_defecto,tema,texto,resumen_inteligente,dias_aviso,umbral_presupuesto").maybeSingle();
+    .select("nombre,voz_idioma,voz_activa,voz_motor,cuenta_defecto,tema,texto,resumen_inteligente,dias_aviso,umbral_presupuesto").maybeSingle();
   return { ...AJUSTES_DEFECTO, ...(data ?? {}) } as Ajustes;
 }
 

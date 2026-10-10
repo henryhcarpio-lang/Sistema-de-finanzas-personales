@@ -8,6 +8,7 @@ import { separarMovimientos } from "@/lib/separar";
 import { elegirCandidata } from "@/lib/transcripcion";
 import { etiquetaFecha, soles, todayLima } from "@/lib/dates";
 import type { Categoria, Draft, Fuente, Preferencia } from "@/lib/types";
+import type { AjusteMotor } from "@/lib/voz/motor";
 import { MovimientoFields, camposAInput, type Campos } from "./MovimientoFields";
 
 type Estado =
@@ -26,8 +27,8 @@ const draftACampos = (d: Draft): Campos => ({
   occurred_on: d.occurred_on, tags: d.tags.join(", "), note: "",
 });
 
-export function RegistroRapido({ prefs, categorias, voz: vozAjustes = { activa: true, idioma: "es-PE" }, cuenta = null }: {
-  prefs: Preferencia[]; categorias: Categoria[]; voz?: { activa: boolean; idioma: string }; cuenta?: string | null;
+export function RegistroRapido({ prefs, categorias, voz: vozAjustes = { activa: true, idioma: "es-PE", motor: "auto" }, cuenta = null }: {
+  prefs: Preferencia[]; categorias: Categoria[]; voz?: { activa: boolean; idioma: string; motor?: AjusteMotor }; cuenta?: string | null;
 }) {
   const [texto, setTexto] = useState("");
   const [estado, setEstado] = useState<Estado>({ k: "idle" });
@@ -69,7 +70,7 @@ export function RegistroRapido({ prefs, categorias, voz: vozAjustes = { activa: 
 
   // De las interpretaciones del reconocedor, se usa la que tiene sentido como movimiento.
   const voz = useVozRegistro((candidatas) =>
-    interpretar(elegirCandidata(candidatas, (c) => parseMovimiento(c, todayLima(), prefs)).texto, "voz"), vozAjustes.idioma);
+    interpretar(elegirCandidata(candidatas, (c) => parseMovimiento(c, todayLima(), prefs)).texto, "voz"), vozAjustes.idioma, vozAjustes.motor ?? "auto");
   const conVoz = voz.soportado && vozAjustes.activa;
 
   function guardar(c: Campos, source: Fuente, confidence: number | null, sugerido?: Campos) {
@@ -96,7 +97,7 @@ export function RegistroRapido({ prefs, categorias, voz: vozAjustes = { activa: 
 
   /** Tras un registro por voz en un iPhone afectado, recarga para que el próximo dictado sea "el primero". */
   const recargarSiHaceFalta = (source: Fuente, msg: string) => {
-    if (source !== "voz" || porTeclado.current || !recargaTrasDictar()) return false;
+    if (source !== "voz" || porTeclado.current || voz.motor !== "navegador" || !recargaTrasDictar()) return false;
     try { sessionStorage.setItem("aviso-registro", msg); } catch { return false; }
     window.location.reload();
     return true;
@@ -278,7 +279,7 @@ function Microfono({ voz, ocupado, onIniciar, onTeclado }: {
   voz: ReturnType<typeof useVozRegistro>; ocupado: boolean; onIniciar: () => void; onTeclado: () => void;
 }) {
   const escuchando = voz.estado === "escuchando";
-  const procesando = voz.estado === "procesando";
+  const procesando = voz.estado === "procesando" || voz.estado === "preparando";
   return (
     <div className="card flex flex-col items-center gap-3 p-5" aria-live="polite">
       <button
@@ -302,7 +303,14 @@ function Microfono({ voz, ocupado, onIniciar, onTeclado }: {
         {escuchando ? (
           voz.parcial ? <span className="font-medium">“{voz.parcial}”</span> : <span className="text-muted">Escuchando… di, por ejemplo, “18 soles taxi”</span>
         ) : procesando ? (
-          <span className="text-muted">Procesando…</span>
+          voz.estado === "preparando" ? (
+            <span className="block text-muted" data-testid="voz-preparando">
+              Preparando voz sin conexión (solo la primera vez)…{voz.progreso !== null ? ` ${voz.progreso} %` : ""}
+              <span className="mx-auto mt-2 block h-1.5 w-40 overflow-hidden rounded-full bg-bg" aria-hidden>
+                <span className="block h-full rounded-full bg-brand transition-all" style={{ width: `${voz.progreso ?? 5}%` }} />
+              </span>
+            </span>
+          ) : <span className="text-muted">{voz.motor === "whisper" ? "Transcribiendo…" : "Procesando…"}</span>
         ) : voz.estado === "error" ? (
           <span className="text-neg">{voz.error}</span>
         ) : (

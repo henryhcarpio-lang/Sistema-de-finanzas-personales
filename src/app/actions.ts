@@ -328,6 +328,7 @@ const AjustesInput = z.object({
   nombre: z.string().trim().max(40).nullable(),
   voz_idioma: z.enum(["es-PE", "es-MX", "es-ES", "es-CO", "es-AR", "es-US"]),
   voz_activa: z.boolean(),
+  voz_motor: z.enum(["auto", "navegador", "whisper"]),
   cuenta_defecto: z.string().trim().max(40).nullable(),
   tema: z.enum(["sistema", "claro", "oscuro"]),
   texto: z.enum(["normal", "grande", "muy-grande"]),

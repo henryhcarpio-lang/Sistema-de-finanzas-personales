@@ -47,7 +47,7 @@ Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + 
 
 ## Configuración
 
-Proyecto Supabase: `finanzas-personales` (ref `gjcwiwmqgqlhuquyieia`, región sa-east-1). Las migraciones de `supabase/migrations/` (0001 a 0006) ya están aplicadas.
+Proyecto Supabase: `finanzas-personales` (ref `gjcwiwmqgqlhuquyieia`, región sa-east-1). Las migraciones de `supabase/migrations/` (0001 a 0007) ya están aplicadas.
 
 1. Copia `.env.example` a `.env.local`; ya incluye la URL y la clave publicable del proyecto:
 
@@ -63,11 +63,17 @@ Nota: Supabase pide confirmar el correo al crear una cuenta (Auth → Providers 
 
 ## Voz: compatibilidad
 
-Usa el reconocimiento de voz del navegador (Web Speech API, idioma `es-PE`): sin costo, sin claves y sin pasar el audio por nuestro servidor (el navegador lo envía a su propio servicio de reconocimiento).
+Dos motores, ambos gratuitos y sin servidor propio (`src/hooks/useVozRegistro.ts`, `src/lib/voz/`):
 
-- Funciona en Chrome (Android y escritorio), Edge y Safari (iOS 14.5+ / macOS).
-- En navegadores sin soporte (p. ej. Firefox) el micrófono no aparece y se usa el registro por texto.
-- El micrófono requiere HTTPS (Vercel lo cumple; `localhost` también) y que el usuario conceda el permiso.
+| Motor | Cuándo se usa | Cómo funciona |
+|---|---|---|
+| **Navegador** (Web Speech API, `es-PE`) | Principal en Chrome, Edge, Safari y Android | Texto en vivo; corta tras 1,6 s de pausa; hasta 5 alternativas; watchdog si el navegador no avisa el fin; libera el micrófono al terminar. |
+| **Sin conexión** (Whisper local) | Firefox y navegadores sin Web Speech, o automáticamente si Web Speech falla en el dispositivo (iPhone: abre el micrófono y no devuelve texto) | Graba con `MediaRecorder`, corta tras 1,4 s de silencio (detector de nivel), suelta el micrófono, decodifica a 16 kHz y transcribe con Whisper **en el propio teléfono** (Web Worker + WASM, `transformers.js`, modelo `whisper-base` cuantizado). El audio no sale del dispositivo. |
+
+- La primera vez Whisper descarga ~60 MB (librería desde jsDelivr y modelo desde Hugging Face); queda en caché y luego funciona sin internet. Se puede descargar antes en **Configuración › Motor de voz**.
+- Configuración › **Motor de voz**: Automático (recomendado), Navegador o Sin conexión.
+- Si nada funciona, «Dictar con el teclado» usa el dictado del sistema y se interpreta solo.
+- Diagnóstico: abre la app con `?voz=debug` para ver motor, eventos y tiempos.
 
 ## Scripts
 
