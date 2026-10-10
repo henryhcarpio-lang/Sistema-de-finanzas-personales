@@ -1,37 +1,111 @@
 # Sistema de Finanzas Personales
 
-App web mobile-first para registrar movimientos en ~5 segundos: **escribir → interpretar → confirmar → registrar**.
+App web mobile-first para registrar movimientos en ~5 segundos: **hablar o escribir → interpretar → confirmar → registrar**.
 
 Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + Postgres con RLS) · Vercel.
 
-## Estado: Fase 1 (núcleo funcional)
+## Estado: Fases 1 a 8 completadas
 
 - Registro por texto en lenguaje natural ("un sol pasaje", "me depositaron 2,500 soles") con tarjeta **Confirmar | Editar**.
 - Clasificación inicial por reglas (tipo, categoría, naturaleza, etiquetas, confianza). Las frases ambiguas ("Banco 500") piden el tipo.
 - Registro manual, edición y eliminación con confirmación.
 - Historial con filtros por periodo, categoría, tipo y búsqueda, con totales.
+- **Fase 4:** filtros por naturaleza, etiqueta y rango de monto; periodo "Últimos 30 días"; búsqueda en concepto y nota; agrupación por día, categoría o etiqueta con subtotales; frase de respuesta ("Gastaste S/ 60.00 en Almuerzo este mes"); filtros activos como chips; las categorías del dashboard abren su historial. Los filtros viven en la URL (se pueden guardar o compartir).
 - Dashboard: ingresos, gastos, balance, ahorro, necesidades/deseos/deudas, gasto por categoría y comparación con el periodo anterior.
 - Autenticación por correo y contraseña; los datos de cada usuario están aislados con RLS.
+- **Fase 5:** dashboard avanzado: gráfico de gasto por día (por mes en el periodo Año) con tooltip, foco con teclado y vista de tabla; reparto necesidades / deseos / deudas; proyección del gasto al cierre del mes; variación por categoría y total frente al periodo anterior.
+- **Fase 6:** presupuestos mensuales por categoría (sobres): gastado, disponible, % usado y proyección; estados *en orden*, *en riesgo* (la proyección supera el límite), *cerca del límite* (≥ 80 %) y *excedido*, siempre con icono y texto. Al registrar un gasto con presupuesto, la app dice cuánto queda. Nunca bloquea un gasto.
+- **Fase 7:** deudas y pagos recurrentes (pestaña *Pagos*). Cuotas mensuales, semanales o anuales calculadas a partir de cada compromiso; vencidas, de hoy y próximas; botón **Pagar** que crea el movimiento real vinculado a la cuota (una cuota futura nunca cuenta como gasto, y no se puede pagar dos veces). Deudas con saldo, cuotas pagadas/total, acreedor y tasa. El dashboard muestra los próximos compromisos de 7 días.
+- **Fase 8: inteligencia financiera** (sección *Tu resumen inteligente* del Resumen): resumen del mes en palabras, gastos atípicos frente a lo habitual de su categoría, categorías que suben comparadas a la misma fecha de meses anteriores, aumento de gastos en deseos y presupuestos sugeridos con botón "Usar S/ X". Con menos de 3 semanas de datos no da recomendaciones. Solo sugiere: nada se crea sin que el usuario lo toque (`src/lib/inteligencia.ts`).
+- **Categorías con grupos e iconos:** 22 categorías en 7 grupos (Comida y bebida, Estilo de vida, Familia, Hogar y servicios, Transporte, Finanzas, Otros), cada una con icono y color. Nuevas: Restaurantes, Cuidado personal, Ropa, Hijos, Mascotas, Regalos y Gasolina (el clasificador ya las usa). Tocar una categoría permite **renombrarla** (se actualiza en movimientos, presupuestos, pagos y preferencias), cambiar icono, color, grupo y naturaleza, o eliminarla.
+- **Configuración** (engranaje ⚙): nombre para el saludo; voz activa y acento (Perú, México, Colombia, Argentina, España, EE. UU.); cuenta por defecto; tema automático/claro/oscuro; tamaño de texto normal/grande/muy grande; mostrar u ocultar el resumen inteligente; días de aviso de pagos (3/7/14); umbral de aviso de presupuesto (70/80/90 %); exportar movimientos a CSV; cambiar contraseña; cerrar sesión; borrar todos los datos (hay que escribir BORRAR).
+- **Editar deudas y pagos:** cada deuda y pago recurrente tiene **Editar** (nombre, cuota, día, nº de cuotas, saldo, acreedor, tasa). Campo **"Voy en la cuota Nº"**: si un préstamo de 12 cuotas ya va en la 8, la app empieza en la 8/12 y cuenta 7 pagadas sin crear gastos falsos. Cada pago hecho aparece en *Pagos registrados* con su número de cuota y se puede editar o eliminar.
+- **Diseño táctil:** todo lo tocable mide al menos 44 px, textos de 13–16 px, campos a 16 px (sin zoom de iOS), sin zoom por doble toque; barra inferior de 5 zonas anchas en celular y barra lateral con Resumen a dos columnas en computadora.
+- **Ver un día específico:** periodos *Ayer* y *Día* (con navegación ‹ › día a día y selector de fecha) en Movimientos y Dashboard; los demás filtros se conservan al cambiar de día.
+- **Fechas en la frase:** "ayer 18 soles taxi", "anteayer…", "hace 3 días…", "el lunes…", "el 3 de octubre…", "el día 10…". La tarjeta muestra la fecha detectada.
+- **Instalable:** manifiesto e iconos para "Agregar a la pantalla de inicio" (Android e iPhone).
+- **Fase 2:** categorías editables por usuario (pantalla *Categorías*), con naturaleza por defecto.
+- **Fase 2:** preferencias aprendidas: si corriges tipo, categoría o naturaleza (al registrar o al editar), la app lo recuerda para ese concepto y lo usa con prioridad sobre las reglas. La tarjeta de confirmación indica la confianza.
+- **Voz más confiable (iPhone/Safari):** escucha en modo continuo y termina tras 1,6 s de silencio; evalúa hasta 5 interpretaciones y usa la que tiene sentido como gasto; evita duplicados de Safari; reintenta solo si el micrófono no arranca; corrige errores típicos ("pesos", "$", "un sol 20"). Si la voz falla, sugiere el dictado del teclado.
+- **Clasificación ampliada:** ~250 conceptos peruanos con naturaleza por concepto (menú = necesidad; pollo a la brasa, delivery, gaseosa = deseo), gana el concepto más específico y se toleran plurales y tildes (`src/lib/clasificador.ts`).
+- **Fase 3:** registro por voz. Botón de micrófono con estados *escuchando* (transcripción en vivo), *procesando*, tarjeta de confirmación y *error*. Termina solo tras una pausa (o con *Terminar*, máximo 10 s). Entiende números dictados ("treinta y cinco soles", "dos mil quinientos", "dieciocho soles con cincuenta"). Los movimientos se guardan con fuente `voz`.
+
+## Uso diario
+
+1. Abre https://finanzas-personales-pun8.vercel.app en el celular y, en el menú del navegador, elige **"Agregar a la pantalla de inicio"**: queda como una app.
+2. **Registrar:** toca el micrófono y di "dieciocho soles taxi", o escríbelo. ¿Te olvidaste ayer? Di "ayer dieciocho soles taxi". Revisa la tarjeta y pulsa **Confirmar**.
+3. Si la categoría no es la correcta, pulsa **Editar** y corrígela: la próxima vez la app lo recordará.
+4. **Dashboard:** cómo vas en el mes, proyección de cierre y en qué estás gastando (toca una categoría para ver su detalle).
+5. **Movimientos:** busca, filtra y agrupa para responder "¿cuánto gasté en…?". Para un día concreto toca **Ayer** o **Día** y muévete con ‹ › o elige la fecha.
+6. **Presupuestos:** define un límite mensual para tus categorías principales; la app te avisa al acercarte.
+7. **Pagos:** registra una vez tus préstamos, tarjetas y pagos fijos; cuando pagues una cuota, pulsa **Pagar** y queda registrada como gasto.
+
+## Producción
+
+- URL: https://finanzas-personales-pun8.vercel.app (proyecto Vercel `finanzas-personales`, funciones en `gru1`, São Paulo, junto a Supabase).
+- En Supabase → Authentication → URL Configuration, usa esa URL como **Site URL** y en **Redirect URLs**.
 
 ## Configuración
 
-1. Aplica `supabase/migrations/0001_movimientos.sql` en tu proyecto Supabase (SQL Editor o `supabase db push`).
-2. Copia `.env.example` a `.env.local` y completa:
+Proyecto Supabase: `finanzas-personales` (ref `gjcwiwmqgqlhuquyieia`, región sa-east-1). Las migraciones de `supabase/migrations/` (0001 a 0008) ya están aplicadas.
+
+1. Copia `.env.example` a `.env.local`; ya incluye la URL y la clave publicable del proyecto:
 
 | Variable | Descripción |
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | URL del proyecto Supabase |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Clave pública (anon/publishable). **Nunca** la service role key. |
 
-3. `npm install && npm run dev`
+2. `npm install && npm run dev`
+3. En Vercel, configura las mismas dos variables.
+
+Nota: Supabase pide confirmar el correo al crear una cuenta (Auth → Providers → Email → "Confirm email").
+
+## IA para interpretar (Gemini, plan gratuito)
+
+Las reglas locales interpretan al instante la mayoría de frases. Solo cuando dudan (sin monto claro, confianza baja o tipo ambiguo), el servidor consulta **Gemini** (`gemini-flash-lite-latest`, plan gratuito) con las categorías y preferencias del usuario y devuelve movimientos validados (`src/lib/ia.ts`, acción `interpretarConIA`). La IA asiste, no decide: siempre se confirma en la tarjeta.
+
+- Clave solo en el servidor: variable `GEMINI_API_KEY` en Vercel (créala gratis en https://aistudio.google.com/apikey). Opcional: `GEMINI_MODEL`.
+- Límite de 200 consultas por usuario y día; si Gemini falla, no hay clave o se agota la cuota, siguen las reglas sin error.
+- Se envía solo la frase y los nombres de categorías. En el plan gratuito Google puede usar esos datos para mejorar sus productos.
+- Configuración › **Interpretar con IA** lo activa o desactiva.
+
+## Voz: compatibilidad
+
+Dos motores, ambos gratuitos y sin servidor propio (`src/hooks/useVozRegistro.ts`, `src/lib/voz/`):
+
+| Motor | Cuándo se usa | Cómo funciona |
+|---|---|---|
+| **Navegador** (Web Speech API, `es-PE`) | Principal en Chrome, Edge, Safari y Android | Texto en vivo; corta tras 1,6 s de pausa; hasta 5 alternativas; watchdog si el navegador no avisa el fin; libera el micrófono al terminar. |
+| **Sin conexión** (Whisper local) | Firefox y navegadores sin Web Speech, o automáticamente si Web Speech falla en el dispositivo (iPhone: abre el micrófono y no devuelve texto) | Graba con `MediaRecorder`, corta tras 1,4 s de silencio (detector de nivel), suelta el micrófono, decodifica a 16 kHz y transcribe con Whisper **en el propio teléfono** (Web Worker + WASM, `transformers.js`, modelo `whisper-base` cuantizado). El audio no sale del dispositivo. |
+
+- La primera vez Whisper descarga ~60 MB (librería desde jsDelivr y modelo desde Hugging Face); queda en caché y luego funciona sin internet. Se puede descargar antes en **Configuración › Motor de voz**.
+- Configuración › **Motor de voz**: Automático (recomendado), Navegador o Sin conexión.
+- Si nada funciona, «Dictar con el teclado» usa el dictado del sistema y se interpreta solo.
+- Diagnóstico: abre la app con `?voz=debug` para ver motor, eventos y tiempos.
 
 ## Scripts
 
-`npm run dev` · `npm run build` · `npm run lint` · `npm run typecheck` · `npm test`
+`npm run dev` · `npm run build` · `npm run lint` · `npm run typecheck` · `npm test` · `npm run e2e`
+
+### Pruebas end-to-end (`npm run e2e`)
+
+Recorren la app en un navegador (375 px) contra Supabase real. **Vacían la cuenta de prueba en cada suite: nunca uses tu cuenta real.**
+
+```bash
+npm run build && npm start   # en otra terminal
+BASE_URL=http://localhost:3000 E2E_EMAIL=... E2E_PASSWORD=... npm run e2e
+```
+
+Necesitan una cuenta de prueba confirmada en Supabase y `.env.local`. Opcional: `CHROMIUM_PATH` si Playwright no encuentra el navegador. Las capturas quedan en `e2e/capturas/` (ignorado por git).
 
 ## Deuda técnica / siguientes fases
 
-- Fase 2: categorías editables en la base de datos y preferencias aprendidas de las correcciones.
-- Fase 3: voz (micrófono + transcripción).
-- Cuentas y deudas solo existen como campo/tipo; sus tablas llegan en fases posteriores.
+- Los movimientos guardan el nombre de la categoría como texto (renombrar lo actualiza en una función SQL transaccional).
+- Las etiquetas aún no se aprenden de las correcciones.
+- Los presupuestos son mensuales; periodos semanales o anuales quedan para más adelante.
+- La app es instalable pero aún no funciona sin conexión (no hay service worker).
+- Voz: si en el futuro se necesita soporte en Firefox o más precisión, se puede cambiar a transcripción en el servidor (p. ej. Whisper); el componente solo entrega texto a `parseMovimiento`.
+- Cuentas (efectivo, banco, tarjeta) solo existen como campo; su gestión llega más adelante.
+- Compromisos: el monto pagado es siempre la cuota; un pago parcial se registra editando el movimiento creado. No hay recordatorios por notificación.
 - El dashboard agrega en el servidor sobre las filas del periodo; si el volumen crece, conviene moverlo a vistas o RPC en SQL.

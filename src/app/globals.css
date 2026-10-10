@@ -4,16 +4,22 @@
   --bg: #f6f7f9;
   --surface: #ffffff;
   --fg: #0f172a;
-  --muted: #64748b;
+  --muted: #556274;
   --line: #e5e7eb;
   --brand: #0d9488;
   --brand-fg: #ffffff;
   --pos: #059669;
   --neg: #dc2626;
+  /* Series de datos (paleta validada para daltonismo; ver skill dataviz) */
+  --warn: #b45309;
+  --serie-1: #2a78d6;
+  --serie-2: #eb6834;
+  --serie-3: #1baf7a;
 }
 
+/* Tema oscuro: el del sistema, salvo que el usuario elija "claro"; o forzado con "oscuro". */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-tema="claro"]) {
     --bg: #0b0f14;
     --surface: #131a22;
     --fg: #e6edf3;
@@ -23,8 +29,33 @@
     --brand-fg: #04201d;
     --pos: #34d399;
     --neg: #f87171;
+    --warn: #fbbf24;
+    --serie-1: #3987e5;
+    --serie-2: #d95926;
+    --serie-3: #199e70;
   }
 }
+:root[data-tema="oscuro"] {
+    --bg: #0b0f14;
+    --surface: #131a22;
+    --fg: #e6edf3;
+    --muted: #8b98a5;
+    --line: #233040;
+    --brand: #2dd4bf;
+    --brand-fg: #04201d;
+    --pos: #34d399;
+    --neg: #f87171;
+    --warn: #fbbf24;
+    --serie-1: #3987e5;
+    --serie-2: #d95926;
+    --serie-3: #199e70;
+}
+
+/* Tamaño de texto elegido en Configuración (todo está en rem, así que escala junto). */
+:root[data-texto="grande"] { font-size: 112.5%; }
+:root[data-texto="muy-grande"] { font-size: 125%; }
+:root[data-tema="oscuro"] { color-scheme: dark; }
+:root[data-tema="claro"] { color-scheme: light; }
 
 @theme inline {
   --color-bg: var(--bg);
@@ -36,28 +67,49 @@
   --color-brand-fg: var(--brand-fg);
   --color-pos: var(--pos);
   --color-neg: var(--neg);
+  --color-warn: var(--warn);
+  --color-serie-1: var(--serie-1);
+  --color-serie-2: var(--serie-2);
+  --color-serie-3: var(--serie-3);
   --font-sans: var(--font-geist-sans);
+  /* Escala legible en celular: xs 13px, sm 15px (antes 12 y 14). */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.375rem;
 }
 
+html {
+  /* Sin zoom por doble toque ni retardo de 300 ms: un toque = una acción. */
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+}
 body {
   background: var(--bg);
   color: var(--fg);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
-  -webkit-tap-highlight-color: transparent;
+  -webkit-tap-highlight-color: rgba(13, 148, 136, 0.12);
 }
+/* iOS hace zoom al enfocar campos con texto < 16 px y la página se desplaza bajo el dedo. */
+input, select, textarea { font-size: 16px; }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 
 @utility card {
   @apply rounded-2xl border border-line bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.04)];
 }
 @utility btn {
-  @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold transition active:scale-[0.98] disabled:opacity-50;
+  @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 text-base font-semibold transition select-none active:scale-[0.98] disabled:opacity-50;
 }
 @utility btn-primary { @apply btn bg-brand text-brand-fg; }
 @utility btn-ghost { @apply btn border border-line bg-surface text-fg; }
 @utility field {
-  @apply min-h-11 w-full rounded-xl border border-line bg-surface px-3 text-base text-fg outline-none focus:border-brand focus:ring-2 focus:ring-brand/20;
+  @apply min-h-12 w-full rounded-xl border border-line bg-surface px-3 text-base text-fg outline-none focus:border-brand focus:ring-2 focus:ring-brand/20;
 }
-@utility label { @apply mb-1 block text-xs font-medium text-muted; }
+@utility label { @apply mb-1.5 block text-sm font-medium text-muted; }
+/* Enlace o botón de texto secundario con zona táctil de 44 px. */
+@utility tap {
+  @apply inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-3 text-sm font-medium;
+}
 
 @keyframes pop-in { from { opacity: 0; transform: translateY(6px) scale(0.98); } to { opacity: 1; transform: none; } }
 .pop-in { animation: pop-in 160ms ease-out; }

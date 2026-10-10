@@ -20,7 +20,18 @@ export function addDays(iso: string, n: number): string {
   return fmt(y, m, d + n);
 }
 
-export type Periodo = "hoy" | "semana" | "mes" | "anio" | "rango";
+export type Periodo = "hoy" | "ayer" | "semana" | "mes" | "30d" | "anio" | "dia" | "rango";
+
+export const PERIODOS: { v: Periodo; l: string; frase: string }[] = [
+  { v: "hoy", l: "Hoy", frase: "hoy" },
+  { v: "ayer", l: "Ayer", frase: "ayer" },
+  { v: "semana", l: "Semana", frase: "esta semana" },
+  { v: "mes", l: "Mes", frase: "este mes" },
+  { v: "30d", l: "30 días", frase: "en los últimos 30 días" },
+  { v: "anio", l: "Año", frase: "este año" },
+  { v: "dia", l: "Día", frase: "ese día" },
+  { v: "rango", l: "Rango", frase: "en el rango elegido" },
+];
 
 export interface Rango {
   from: string;
@@ -31,12 +42,21 @@ export interface Rango {
 export function rangoPeriodo(
   periodo: Periodo,
   today: string,
-  custom?: { from?: string; to?: string },
+  custom?: { from?: string; to?: string; d?: string },
 ): Rango {
   const { y, m } = parts(today);
   switch (periodo) {
     case "hoy":
       return { from: today, to: today };
+    case "ayer": {
+      const ayer = addDays(today, -1);
+      return { from: ayer, to: ayer };
+    }
+    case "dia": {
+      // Un día concreto; nunca en el futuro.
+      const d = custom?.d && /^\d{4}-\d{2}-\d{2}$/.test(custom.d) && custom.d <= today ? custom.d : today;
+      return { from: d, to: d };
+    }
     case "semana": {
       const dow = (new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7; // lunes=0
       const from = addDays(today, -dow);
@@ -44,6 +64,8 @@ export function rangoPeriodo(
     }
     case "mes":
       return { from: fmt(y, m, 1), to: fmt(y, m + 1, 0) };
+    case "30d":
+      return { from: addDays(today, -29), to: today };
     case "anio":
       return { from: fmt(y, 1, 1), to: fmt(y, 12, 31) };
     case "rango": {
@@ -68,3 +90,38 @@ export const soles = (n: number) =>
     currency: "PEN",
     currencyDisplay: "narrowSymbol",
   }).format(n);
+
+const DIAS_CORTOS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+
+/** "Ayer · sáb 03/10", "Anteayer · vie 02/10" o "lun 28/09" (para fechas distintas de hoy). */
+export function etiquetaFecha(fecha: string, today: string): string {
+  const d = new Date(`${fecha}T00:00:00Z`);
+  const corta = `${DIAS_CORTOS[d.getUTCDay()]} ${fecha.slice(8, 10)}/${fecha.slice(5, 7)}`;
+  if (fecha === today) return `Hoy · ${corta}`;
+  if (fecha === addDays(today, -1)) return `Ayer · ${corta}`;
+  if (fecha === addDays(today, -2)) return `Anteayer · ${corta}`;
+  return fecha.slice(0, 4) === today.slice(0, 4) ? corta : `${corta}/${fecha.slice(0, 4)}`;
+}
+
+/**
+ * Periodo y rango a partir de la URL. Un "día" que cae hoy o ayer se muestra
+ * como Hoy / Ayer, para que el chip correcto quede marcado.
+ */
+export function resolverPeriodo(p: Periodo, today: string, q: { from?: string; to?: string; d?: string }): { p: Periodo; rango: Rango } {
+  const rango = rangoPeriodo(p, today, q);
+  if (p === "dia" && rango.from === today) return { p: "hoy", rango };
+  if (p === "dia" && rango.from === addDays(today, -1)) return { p: "ayer", rango };
+  return { p, rango };
+}
+
+/** "hoy", "este mes", "el sáb 03/10"… para frases como "Gastaste S/ X …". */
+export function frasePeriodo(p: Periodo, rango: Rango): string {
+  if (p === "dia") {
+    const d = new Date(`${rango.from}T00:00:00Z`);
+    return `el ${DIAS_CORTOS[d.getUTCDay()]} ${rango.from.slice(8, 10)}/${rango.from.slice(5, 7)}`;
+  }
+  return PERIODOS.find((x) => x.v === p)!.frase;
+}
+
+/** Vistas de un solo día (Hoy, Ayer o un día elegido). */
+export const esUnDia = (p: Periodo) => p === "hoy" || p === "ayer" || p === "dia";

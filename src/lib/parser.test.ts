@@ -47,3 +47,58 @@ describe("rangoPeriodo", () => {
     expect(rangoPeriodo("anio", T)).toEqual({ from: "2026-01-01", to: "2026-12-31" });
   });
 });
+
+describe("concepto", () => {
+  it("quita verbos con tilde", () => {
+    expect(p("Gasté 18 soles en taxi").concept).toBe("Taxi");
+    expect(p("Pagué 35 del almuerzo").concept).toBe("Almuerzo");
+  });
+});
+
+describe("preferencias aprendidas", () => {
+  const prefs = [
+    { keyword: "pasaje", type: "egreso" as const, nature: "deseo" as const, category: "Entretenimiento", hits: 1 },
+    { keyword: "banco", type: "deuda" as const, nature: "deuda" as const, category: "Deudas", hits: 2 },
+  ];
+  it("una corrección previa tiene prioridad sobre las reglas", () => {
+    const d = parseMovimiento("Un sol pasaje", T, prefs)!;
+    expect(d).toMatchObject({ category: "Entretenimiento", nature: "deseo", confidence: 0.95 });
+  });
+  it("resuelve la ambigüedad aprendida de 'Banco 500'", () => {
+    const d = parseMovimiento("Banco 500", T, prefs)!;
+    expect(d).toMatchObject({ type: "deuda", needsType: false });
+  });
+  it("solo coincide con palabras completas", () => {
+    expect(parseMovimiento("20 soles pasajero", T, prefs)!.category).not.toBe("Entretenimiento");
+  });
+});
+
+describe("números dictados (voz)", () => {
+  it.each([
+    ["dieciocho soles taxi", 18],
+    ["treinta y cinco soles almuerzo", 35],
+    ["ciento veinte soles supermercado", 120],
+    ["me depositaron dos mil quinientos soles", 2500],
+    ["veintidós soles cine", 22],
+    ["mil soles alquiler", 1000],
+    ["dieciocho soles con cincuenta taxi", 18.5],
+    ["18 soles con 50 taxi", 18.5],
+    ["un sol con veinte céntimos pasaje", 1.2],
+  ])("%s → %d", (frase, monto) => {
+    expect(p(frase).amount).toBe(monto);
+  });
+  it("el concepto no arrastra el número ni los céntimos", () => {
+    expect(p("dieciocho soles con cincuenta taxi").concept).toBe("Taxi");
+    expect(p("18 soles con 50 taxi").concept).toBe("Taxi");
+  });
+  it("palabras sueltas sin 'soles' no son monto", () => {
+    expect(parseMovimiento("dos pasajes", T)).toBeNull();
+  });
+});
+
+describe("periodoAnterior de un día", () => {
+  it("compara con el día previo", async () => {
+    const { periodoAnterior } = await import("./dates");
+    expect(periodoAnterior({ from: "2026-10-03", to: "2026-10-03" })).toEqual({ from: "2026-10-02", to: "2026-10-02" });
+  });
+});

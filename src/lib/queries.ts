@@ -1,7 +1,9 @@
 import "server-only";
 import { requireUser } from "./supabase/server";
-import type { Rango } from "./dates";
-import type { Transaction } from "./types";
+import { rangoPeriodo, todayLima, type Rango } from "./dates";
+import type { Compromiso, Pago } from "./compromisos";
+import { estadoPresupuesto, type EstadoPresupuesto } from "./presupuestos";
+import { CATALOGO, type Categoria, type Preferencia, type Transaction } from "./types";
 
 const COLS =
   "id,occurred_on,occurred_time,amount,currency,type,nature,category,subcategory,concept,account,tags,note,source,confidence,created_at";
@@ -10,6 +12,10 @@ export async function listarMovimientos(opts: {
   rango?: Rango;
   category?: string;
   type?: string;
+  nature?: string;
+  tag?: string;
+  min?: number;
+  max?: number;
   q?: string;
   limit?: number;
 }): Promise<Transaction[]> {
@@ -22,11 +28,30 @@ export async function listarMovimientos(opts: {
   if (opts.rango) query = query.gte("occurred_on", opts.rango.from).lte("occurred_on", opts.rango.to);
   if (opts.category) query = query.eq("category", opts.category);
   if (opts.type) query = query.eq("type", opts.type);
-  if (opts.q) query = query.ilike("concept", `%${opts.q.replace(/[%_\\]/g, "\\$&")}%`);
+  if (opts.nature) query = query.eq("nature", opts.nature);
+  if (opts.tag) query = query.contains("tags", [opts.tag]);
+  if (opts.min !== undefined) query = query.gte("amount", opts.min);
+  if (opts.max !== undefined) query = query.lte("amount", opts.max);
+  if (opts.q) {
+    // Busca en concepto y nota. Se quitan los caracteres con significado en el filtro .or() de PostgREST.
+    const term = opts.q.replace(/[%_\\,().*"]/g, " ").trim();
+    if (term) query = query.or(`concept.ilike.%${term}%,note.ilike.%${term}%`);
+  }
   if (opts.limit) query = query.limit(opts.limit);
   const { data, error } = await query;
   if (error) throw new Error("No se pudieron cargar los movimientos");
   return (data ?? []).map((t) => ({ ...t, amount: Number(t.amount) })) as Transaction[];
+}
+
+/** Etiquetas usadas por el usuario (para el filtro), de las más frecuentes a las menos. */
+export async function listarEtiquetas(): Promise<string[]> {
+  const { supabase } = await requireUser();
+  const { data } = await supabase
+    .from("fin_transactions").select("tags").neq("tags", "{}")
+    .order("occurred_on", { ascending: false }).limit(2000);
+  const cuenta = new Map<string, number>();
+  for (const r of data ?? []) for (const t of r.tags as string[]) cuenta.set(t, (cuenta.get(t) ?? 0) + 1);
+  return [...cuenta.entries()].sort((a, b) => b[1] - a[1]).map(([t]) => t);
 }
 
 export async function obtenerMovimiento(id: string): Promise<Transaction | null> {
@@ -52,3 +77,138 @@ export function resumir(txs: Transaction[]) {
   const categorias = [...porCategoria.entries()].sort((a, b) => b[1] - a[1]);
   return { ...r, balance: r.ingresos - r.gastos - r.ahorro, categorias };
 }
+
+/** Categorías del usuario; la primera vez se crean las iniciales para que pueda editarlas. */
+export async function listarCategorias(): Promise<Categoria[]> {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase.from("fin_categories").select("id,name,nature,grupo,icono,color").order("name");
+  if (error) throw new Error("No se pudieron cargar las categorías");
+  if (data.length) return data as Categoria[];
+  // Se usa lo que devuelve el upsert: repetir el mismo SELECT en este render
+  // devolvería la respuesta vacía memorizada por Next.
+  const { data: creadas } = await supabase
+    .from("fin_categories")
+    .upsert(
+      CATALOGO.map(([name, grupo, icono, color, nature]) => ({ name, grupo, icono, color, nature, user_id: user.id })),
+      { onConflict: "user_id,name" },
+    )
+    .select("id,name,nature,grupo,icono,color");
+  return ((creadas ?? []) as Categoria[]).sort((a, b) => a.name.localeCompare(b.name, "es"));
+}
+
+export async function listarPreferencias(): Promise<Preferencia[]> {
+  const { supabase } = await requireUser();
+  const { data } = await supabase
+    .from("fin_preferences")
+    .select("keyword,type,nature,category,hits")
+    .order("hits", { ascending: false })
+    .limit(500);
+  return (data ?? []) as Preferencia[];
+}
+
+export interface Presupuesto {
+  id: string;
+  category: string;
+  monthly_limit: number;
+}
+
+export type PresupuestoConEstado = Presupuesto & { estado: EstadoPresupuesto };
+
+/** Mes en curso (Lima): rango, día actual y días del mes. */
+export function mesActual(today = todayLima()) {
+  const rango = rangoPeriodo("mes", today);
+  return { rango, dia: Number(today.slice(8, 10)), diasMes: Number(rango.to.slice(8, 10)) };
+}
+
+/** Presupuestos del usuario con lo gastado en el mes en curso, los más comprometidos primero. */
+export async function listarPresupuestos(umbral?: number): Promise<PresupuestoConEstado[]> {
+  const { supabase } = await requireUser();
+  const { rango, dia, diasMes } = mesActual();
+  const [{ data: budgets, error }, txs] = await Promise.all([
+    supabase.from("fin_budgets").select("id,category,monthly_limit").order("category"),
+    listarMovimientos({ rango }),
+  ]);
+  if (error) throw new Error("No se pudieron cargar los presupuestos");
+  const gastado = new Map<string, number>();
+  for (const t of txs) {
+    if (t.type === "egreso" || t.type === "deuda") gastado.set(t.category, (gastado.get(t.category) ?? 0) + t.amount);
+  }
+  return (budgets ?? [])
+    .map((b) => {
+      const limite = Number(b.monthly_limit);
+      return { ...b, monthly_limit: limite, estado: estadoPresupuesto(limite, gastado.get(b.category) ?? 0, dia, diasMes, umbral) };
+    })
+    .sort((a, b) => b.estado.porcentaje - a.estado.porcentaje);
+}
+
+/** Compromisos activos (deudas y recurrentes). */
+export async function listarCompromisos(): Promise<Compromiso[]> {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase
+    .from("fin_recurrents")
+    .select("id,kind,name,creditor,category,amount,frequency,day_of_month,start_date,end_date,installments_total,initial_amount,interest_rate,installments_paid_before")
+    .eq("active", true)
+    .order("name");
+  if (error) throw new Error("No se pudieron cargar los compromisos");
+  return (data ?? []).map((c) => ({
+    ...c,
+    amount: Number(c.amount),
+    initial_amount: c.initial_amount === null ? null : Number(c.initial_amount),
+    interest_rate: c.interest_rate === null ? null : Number(c.interest_rate),
+  })) as Compromiso[];
+}
+
+/** Pagos registrados (movimientos vinculados a una cuota). */
+export async function listarPagos(): Promise<Pago[]> {
+  const { supabase } = await requireUser();
+  const { data } = await supabase
+    .from("fin_transactions").select("id,recurrent_id,due_date,amount,occurred_on")
+    .order("occurred_on", { ascending: false })
+    .not("recurrent_id", "is", null).limit(5000);
+  return (data ?? []).map((p) => ({ ...p, amount: Number(p.amount) })) as Pago[];
+}
+
+/** Movimientos del mes en curso por categoría (para la pantalla Categorías). */
+export async function conteoCategoriasMes(): Promise<Record<string, number>> {
+  const { supabase } = await requireUser();
+  const { rango } = mesActual();
+  const { data } = await supabase.from("fin_transactions").select("category")
+    .gte("occurred_on", rango.from).lte("occurred_on", rango.to).limit(5000);
+  const out: Record<string, number> = {};
+  for (const r of data ?? []) out[r.category] = (out[r.category] ?? 0) + 1;
+  return out;
+}
+
+export interface Ajustes {
+  nombre: string | null;
+  voz_idioma: string;
+  voz_activa: boolean;
+  voz_motor: "auto" | "navegador" | "whisper";
+  usar_ia: boolean;
+  cuenta_defecto: string | null;
+  tema: "sistema" | "claro" | "oscuro";
+  texto: "normal" | "grande" | "muy-grande";
+  resumen_inteligente: boolean;
+  dias_aviso: number;
+  umbral_presupuesto: number;
+}
+
+export const AJUSTES_DEFECTO: Ajustes = {
+  nombre: null, voz_idioma: "es-PE", voz_activa: true, voz_motor: "auto", usar_ia: true, cuenta_defecto: null, tema: "sistema", texto: "normal",
+  resumen_inteligente: true, dias_aviso: 7, umbral_presupuesto: 80,
+};
+
+/** Ajustes del usuario; si nunca guardó, los valores por defecto. */
+export async function obtenerAjustes(): Promise<Ajustes> {
+  const { supabase } = await requireUser();
+  const { data } = await supabase.from("fin_settings")
+    .select("nombre,voz_idioma,voz_activa,voz_motor,usar_ia,cuenta_defecto,tema,texto,resumen_inteligente,dias_aviso,umbral_presupuesto").maybeSingle();
+  return { ...AJUSTES_DEFECTO, ...(data ?? {}) } as Ajustes;
+}
+
+/** Mapa nombre de categoría → icono y color, para pintar listas. */
+export const mapaCategorias = (cats: Categoria[]) =>
+  Object.fromEntries(cats.map((c) => [c.name, { icono: c.icono, color: c.color }]));
+
+/** Hay clave de Gemini configurada en el servidor (no expone la clave). */
+export const iaDisponible = () => !!process.env.GEMINI_API_KEY;
