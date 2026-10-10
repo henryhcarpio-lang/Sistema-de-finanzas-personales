@@ -47,7 +47,7 @@ Stack: Next.js 16 (App Router) · TypeScript · Tailwind v4 · Supabase (Auth + 
 
 ## Configuración
 
-Proyecto Supabase: `finanzas-personales` (ref `gjcwiwmqgqlhuquyieia`, región sa-east-1). Las migraciones de `supabase/migrations/` (0001 a 0007) ya están aplicadas.
+Proyecto Supabase: `finanzas-personales` (ref `gjcwiwmqgqlhuquyieia`, región sa-east-1). Las migraciones de `supabase/migrations/` (0001 a 0008) ya están aplicadas.
 
 1. Copia `.env.example` a `.env.local`; ya incluye la URL y la clave publicable del proyecto:
 
@@ -60,6 +60,15 @@ Proyecto Supabase: `finanzas-personales` (ref `gjcwiwmqgqlhuquyieia`, región sa
 3. En Vercel, configura las mismas dos variables.
 
 Nota: Supabase pide confirmar el correo al crear una cuenta (Auth → Providers → Email → "Confirm email").
+
+## IA para interpretar (Gemini, plan gratuito)
+
+Las reglas locales interpretan al instante la mayoría de frases. Solo cuando dudan (sin monto claro, confianza baja o tipo ambiguo), el servidor consulta **Gemini** (`gemini-flash-lite-latest`, plan gratuito) con las categorías y preferencias del usuario y devuelve movimientos validados (`src/lib/ia.ts`, acción `interpretarConIA`). La IA asiste, no decide: siempre se confirma en la tarjeta.
+
+- Clave solo en el servidor: variable `GEMINI_API_KEY` en Vercel (créala gratis en https://aistudio.google.com/apikey). Opcional: `GEMINI_MODEL`.
+- Límite de 200 consultas por usuario y día; si Gemini falla, no hay clave o se agota la cuota, siguen las reglas sin error.
+- Se envía solo la frase y los nombres de categorías. En el plan gratuito Google puede usar esos datos para mejorar sus productos.
+- Configuración › **Interpretar con IA** lo activa o desactiva.
 
 ## Voz: compatibilidad
 

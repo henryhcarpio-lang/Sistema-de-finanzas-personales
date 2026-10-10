@@ -1,6 +1,6 @@
 import { RegistroRapido } from "@/components/RegistroRapido";
 import { TxList } from "@/components/TxList";
-import { listarCategorias, listarMovimientos, listarPreferencias, mapaCategorias, obtenerAjustes } from "@/lib/queries";
+import { listarCategorias, listarMovimientos, iaDisponible, listarPreferencias, mapaCategorias, obtenerAjustes } from "@/lib/queries";
 
 export default async function RegistrarPage() {
   const [recientes, prefs, categorias, ajustes] = await Promise.all([
@@ -11,7 +11,8 @@ export default async function RegistrarPage() {
       <div className="space-y-5">
         <h1 className="text-2xl font-bold tracking-tight lg:text-3xl">¿Qué movimiento hiciste?</h1>
         <RegistroRapido prefs={prefs} categorias={categorias}
-          voz={{ activa: ajustes.voz_activa, idioma: ajustes.voz_idioma, motor: ajustes.voz_motor }} cuenta={ajustes.cuenta_defecto} />
+          voz={{ activa: ajustes.voz_activa, idioma: ajustes.voz_idioma, motor: ajustes.voz_motor }} cuenta={ajustes.cuenta_defecto}
+          ia={ajustes.usar_ia && iaDisponible()} />
       </div>
       <section className="space-y-2 lg:pt-14">
         <h2 className="text-sm font-semibold text-muted">Últimos movimientos</h2>

@@ -8,7 +8,8 @@ import { avisoTrasGasto, estadoPresupuesto } from "@/lib/presupuestos";
 import { mesActual } from "@/lib/queries";
 import { requireUser } from "@/lib/supabase/server";
 import { claveConcepto } from "@/lib/parser";
-import { FUENTES, NATURALEZAS, TIPOS } from "@/lib/types";
+import { FUENTES, NATURALEZAS, TIPOS, type Draft } from "@/lib/types";
+import { ESQUEMA_IA, MAX_TEXTO_IA, instruccionesIA, respuestaABorradores, type ContextoIA } from "@/lib/ia";
 
 const Movimiento = z.object({
   amount: z.number().positive().max(1e10),
@@ -329,6 +330,7 @@ const AjustesInput = z.object({
   voz_idioma: z.enum(["es-PE", "es-MX", "es-ES", "es-CO", "es-AR", "es-US"]),
   voz_activa: z.boolean(),
   voz_motor: z.enum(["auto", "navegador", "whisper"]),
+  usar_ia: z.boolean(),
   cuenta_defecto: z.string().trim().max(40).nullable(),
   tema: z.enum(["sistema", "claro", "oscuro"]),
   texto: z.enum(["normal", "grande", "muy-grande"]),
@@ -388,5 +390,57 @@ export async function borrarMisDatos(confirmacion: string): Promise<ActionResult
     return { ok: true, id: user.id };
   } catch {
     return { ok: false, error: "Sesión expirada" };
+  }
+}
+
+const LIMITE_IA_DIA = 200;
+
+export type ResultadoIA =
+  | { ok: true; drafts: Draft[] }
+  | { ok: false; motivo: "sin-clave" | "desactivada" | "limite" | "error" | "vacio" };
+
+/**
+ * Interpreta una frase con Gemini (plan gratuito) cuando las reglas locales dudan.
+ * La clave vive solo en el servidor. Ante cualquier fallo devuelve ok:false y la
+ * app sigue con las reglas: la IA nunca bloquea el registro.
+ */
+export async function interpretarConIA(texto: string): Promise<ResultadoIA> {
+  const clave = process.env.GEMINI_API_KEY;
+  if (!clave) return { ok: false, motivo: "sin-clave" };
+  const frase = typeof texto === "string" ? texto.trim().slice(0, MAX_TEXTO_IA) : "";
+  if (!frase) return { ok: false, motivo: "vacio" };
+  try {
+    const { supabase, user } = await requireUser();
+    const hoy = todayLima();
+    const { data: aj } = await supabase.from("fin_settings").select("usar_ia,ia_dia,ia_usos").maybeSingle();
+    if (aj && aj.usar_ia === false) return { ok: false, motivo: "desactivada" };
+    const usos = aj?.ia_dia === hoy ? aj.ia_usos : 0;
+    if (usos >= LIMITE_IA_DIA) return { ok: false, motivo: "limite" };
+    await supabase.from("fin_settings").upsert({ user_id: user.id, ia_dia: hoy, ia_usos: usos + 1 }, { onConflict: "user_id" });
+
+    const [{ data: cats }, { data: prefs }] = await Promise.all([
+      supabase.from("fin_categories").select("name,nature").order("name"),
+      supabase.from("fin_preferences").select("keyword,category").order("hits", { ascending: false }).limit(40),
+    ]);
+    const ctx: ContextoIA = { hoy, categorias: (cats ?? []) as ContextoIA["categorias"], preferencias: prefs ?? [] };
+    const modelo = process.env.GEMINI_MODEL ?? "gemini-flash-lite-latest";
+    const base = process.env.GEMINI_API_URL ?? "https://generativelanguage.googleapis.com";
+    const res = await fetch(`${base}/v1beta/models/${modelo}:generateContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": clave },
+      signal: AbortSignal.timeout(8000),
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: instruccionesIA(ctx) }] },
+        contents: [{ role: "user", parts: [{ text: frase }] }],
+        generationConfig: { temperature: 0, responseMimeType: "application/json", responseSchema: ESQUEMA_IA },
+      }),
+    });
+    if (!res.ok) return { ok: false, motivo: "error" };
+    const cuerpo = await res.json() as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+    const salida = cuerpo.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
+    const drafts = respuestaABorradores(JSON.parse(salida), ctx);
+    return drafts.length ? { ok: true, drafts } : { ok: false, motivo: "vacio" };
+  } catch {
+    return { ok: false, motivo: "error" };
   }
 }

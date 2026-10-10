@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { recargaTrasDictar, useVozRegistro } from "@/hooks/useVozRegistro";
-import { crearMovimiento } from "@/app/actions";
+import { crearMovimiento, interpretarConIA } from "@/app/actions";
+import { conviene } from "@/lib/ia";
 import { parseMovimiento } from "@/lib/parser";
 import { separarMovimientos } from "@/lib/separar";
 import { elegirCandidata } from "@/lib/transcripcion";
@@ -27,8 +28,10 @@ const draftACampos = (d: Draft): Campos => ({
   occurred_on: d.occurred_on, tags: d.tags.join(", "), note: "",
 });
 
-export function RegistroRapido({ prefs, categorias, voz: vozAjustes = { activa: true, idioma: "es-PE", motor: "auto" }, cuenta = null }: {
+export function RegistroRapido({ prefs, categorias, voz: vozAjustes = { activa: true, idioma: "es-PE", motor: "auto" }, cuenta = null, ia = false }: {
   prefs: Preferencia[]; categorias: Categoria[]; voz?: { activa: boolean; idioma: string; motor?: AjusteMotor }; cuenta?: string | null;
+  /** Interpretar con IA (Gemini) las frases que las reglas no entienden bien. */
+  ia?: boolean;
 }) {
   const [texto, setTexto] = useState("");
   const [estado, setEstado] = useState<Estado>({ k: "idle" });
@@ -36,9 +39,29 @@ export function RegistroRapido({ prefs, categorias, voz: vozAjustes = { activa: 
   const [pending, start] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const [consultandoIA, setConsultandoIA] = useState(false);
+
   /** Texto escrito o dictado → tarjeta de confirmación (o pedir el tipo si es ambiguo). */
-  function interpretar(frase: string, source: Fuente) {
+  async function interpretar(frase: string, source: Fuente) {
     setAviso(null);
+    // Si las reglas dudan, se consulta la IA; si falla o no hay clave, siguen las reglas.
+    if (ia) {
+      const hoy0 = todayLima();
+      const varias = separarMovimientos(frase, hoy0).frases.length;
+      if (conviene(parseMovimiento(frase, hoy0, prefs), varias)) {
+        setConsultandoIA(true);
+        const r = await interpretarConIA(frase).catch(() => null);
+        setConsultandoIA(false);
+        if (r?.ok) {
+          setEstado(r.drafts.length > 1 ? { k: "varios", drafts: r.drafts, source } : { k: "confirmar", draft: r.drafts[0], source });
+          return;
+        }
+      }
+    }
+    interpretarConReglas(frase, source);
+  }
+
+  function interpretarConReglas(frase: string, source: Fuente) {
     // Varios movimientos en una frase: "un sol taxi, dos soles pasaje".
     const hoy = todayLima();
     const sep = separarMovimientos(frase, hoy);
@@ -159,6 +182,10 @@ export function RegistroRapido({ prefs, categorias, voz: vozAjustes = { activa: 
         />
         <button className="btn-primary" disabled={!texto.trim() || pending}>Listo</button>
       </form>
+
+      {consultandoIA && (
+        <p role="status" className="pop-in rounded-xl bg-bg px-3 py-2 text-sm text-muted" data-testid="ia-consultando">✨ Interpretando con IA…</p>
+      )}
 
       {aviso && (
         <p role="status" className={`pop-in rounded-xl px-3 py-2 text-sm ${aviso.ok ? "bg-pos/10 text-pos" : "bg-neg/10 text-neg"}`}>

@@ -60,7 +60,7 @@ function Interruptor({ etiqueta, activo, onCambio }: { etiqueta: string; activo:
   );
 }
 
-export function Ajustes({ inicial, correo }: { inicial: AjustesT; correo: string }) {
+export function Ajustes({ inicial, correo, iaDisponible = false }: { inicial: AjustesT; correo: string; iaDisponible?: boolean }) {
   const [a, setA] = useState(inicial);
   const [estado, setEstado] = useState<{ ok: boolean; msg: string } | null>(null);
   const [, start] = useTransition();
@@ -114,6 +114,17 @@ export function Ajustes({ inicial, correo }: { inicial: AjustesT; correo: string
           </select>
           <DescargarVoz />
         </Fila>
+        <div className="flex items-center justify-between gap-3 px-4 py-3">
+          <div>
+            <p className="text-base font-medium">Interpretar con IA</p>
+            <p className="text-xs text-muted">
+              {iaDisponible
+                ? "Si una frase no queda clara, Gemini (gratis) la interpreta. Siempre confirmas tú."
+                : "Aún no está configurada la clave de Gemini en el servidor."}
+            </p>
+          </div>
+          <Interruptor etiqueta="Interpretar con IA" activo={a.usar_ia && iaDisponible} onCambio={(v) => cambiar("usar_ia", v)} />
+        </div>
         <Fila titulo="Cuenta por defecto" ayuda="Se guarda en cada movimiento nuevo.">
           <select className="field" aria-label="Cuenta por defecto" value={a.cuenta_defecto ?? ""} onChange={(e) => cambiar("cuenta_defecto", e.target.value || null)}>
             <option value="">Ninguna</option>
